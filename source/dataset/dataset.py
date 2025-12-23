@@ -8,8 +8,9 @@ from numpy.typing import NDArray
 import albumentations as album
 
 import torch
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, DataLoader
 
+from .utils import get_transforms
 
 
 NPDType = ty.TypeVar("NPDType", bound=np.generic)
@@ -26,25 +27,18 @@ class DataPoint(ty.TypedDict):
 
 
 class CSVDetectionDataset(Dataset):
-    """
-    This dataset provides images, corresponding boxes and facial landmarks.
-    Note, that dataset doesn't include any target building procedure. So,
-    images, boxes and facial landmarks are returned as is, but with augmentations.
-    """
     face_classes: ty.ClassVar[list[str]] = ["face"]
     point_classes: ty.ClassVar[list[str]] = ["left_eye", "right_eye", "nose", "left_lips_corner", "right_lips_corner"]
 
     def __init__(
         self,
         image_dir: str,
-        stage: str, 
         dataframe: pd.DataFrame,
         image_path_col: str,
         boxes_col: str,
         key_points_col: str,
         transforms: album.Compose | None = None,
     ) -> None:
-        self.stage = stage
         self.image_dir = image_dir
         self.images = dataframe[image_path_col].apply(lambda path: os.path.join(self.image_dir, path)).to_numpy()
         self.boxes = dataframe[boxes_col].apply(np.array).to_numpy()
@@ -128,4 +122,38 @@ class CSVDetectionDataset(Dataset):
             kps = np.full(kps.shape, -1)
             kps[valid_kps_idx] = valid_kps
 
-        return {"image": image, "boxes": boxes, "key_points": kps}
+        return {
+            "image": image,
+            "boxes": boxes,
+            "key_points": kps,
+        }
+
+
+def detection_collate_fn( data: list[dict[str, ty.Any]]) -> dict[str, ty.Any]:
+    images = torch.stack([item["image"] for item in data])
+    boxes = [torch.from_numpy(item["boxes"]) for item in data]
+    kps = [torch.from_numpy(item["key_points"]) for item in data]
+    return {"image": images, "boxes": boxes, "key_points": kps}
+
+
+def build_dataloaders(
+    base_data_path: str, dataframe: pd.DataFrame, device: torch.device
+) -> dict[str, DataLoader]:
+    generator = torch.Generator(device=device)
+    dataloaders = {}
+    for subset in ("train", "val"):
+        image_dir = os.path.join(base_data_path, f"WIDER_{subset}", f"WIDER_{subset}", "images")
+        subset_df = dataframe.query(f"subset == '{subset}'").reset_index(drop=True)
+        transforms = get_transforms(subset=subset)
+        dataset = CSVDetectionDataset(
+            image_dir, subset_df, "image", "boxes", "key_points", transforms
+        )
+        dataloaders[subset] = DataLoader(
+            dataset,
+            batch_size=8,
+            shuffle=subset=="train",
+            num_workers=0,
+            generator=generator,
+            collate_fn=detection_collate_fn
+        )
+    return dataloaders

@@ -1,7 +1,6 @@
 # Project specific.
 data/
 *.csv
-*.ipynb
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
