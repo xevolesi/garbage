@@ -43,7 +43,7 @@ def generate_targets(
         [priors[:, :2] + priors[:, 2:] * 0.5, priors[:, 2:]], dim=-1
     )
 
-    assigned_gt_ids, assigned_labels = simota_assign_per_image(
+    assigned_gt_ids, assigned_labels, pos_ious = simota_assign_per_image(
         cls_logits.sigmoid() * obj_logits.unsqueeze(1).sigmoid(),
         offset_priors,
         boxes_xyxy,
@@ -67,7 +67,7 @@ def generate_targets(
 
     target_cls[fg_inds] = torch.nn.functional.one_hot(
         fg_gt_labels.long(), num_classes
-    ).to(dtype)
+    ).to(dtype) * pos_ious.unsqueeze(-1)
 
     target_boxes[fg_inds] = gt_boxes[fg_gt_inds].to(dtype)
 

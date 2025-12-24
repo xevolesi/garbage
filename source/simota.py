@@ -221,4 +221,4 @@ def simota_assign_per_image(
     fg_matched_gt = matched_gt_valid[fg_valid_j] 
     assigned_gt_ids[fg_valid_idx] = fg_matched_gt
     assigned_labels[fg_valid_idx] = gt_labels[fg_matched_gt].long()
-    return assigned_gt_ids, assigned_labels
+    return assigned_gt_ids, assigned_labels, matched_ious_valid
