@@ -90,13 +90,6 @@ def dynamic_k_matching(
     k = min(topk, num_valid)
     top_ious, _ = torch.topk(ious, k, dim=1)
 
-    if num_valid == 0:
-        
-        print("cost_matrix", cost_matrix.shape)
-        print("ious", ious.shape)
-        num_gt, num_valid = ious.shape
-        print("num_gt", num_gt, "num_valid", num_valid)
-        raise RuntimeError("No valid priors in dynamic_k_matching")
     ks = torch.clamp(top_ious.sum(1).int(), min=1).tolist()
     
     # For i-th GT box select the best ks[i] predictions from valid boxes.
@@ -122,6 +115,43 @@ def dynamic_k_matching(
     matched_gt_valid = matching_matrix.argmax(dim=0)
     matched_ious_valid = (matching_matrix * ious).sum(0)[fg_mask_valid]
     return fg_mask_valid, matched_gt_valid, matched_ious_valid
+
+
+def safe_box_iou(
+    boxes1: torch.Tensor, boxes2: torch.Tensor, eps: float = 1e-7
+) -> torch.Tensor:
+    """
+    IoU для боксов в формате xyxy с защитой от degenerate/NaN.
+    boxes1: [N, 4], boxes2: [M, 4]
+    """
+    if boxes1.numel() == 0 or boxes2.numel() == 0:
+        return boxes1.new_zeros((boxes1.shape[0], boxes2.shape[0]))
+
+    # Приводим к float32/float64
+    boxes1 = boxes1.to(dtype=torch.float32)
+    boxes2 = boxes2.to(dtype=torch.float32)
+
+    x1_1, y1_1, x2_1, y2_1 = boxes1.unbind(-1)
+    x1_2, y1_2, x2_2, y2_2 = boxes2.unbind(-1)
+
+    # Площади, отрицательные обнуляем
+    area1 = ((x2_1 - x1_1).clamp(min=0) * (y2_1 - y1_1).clamp(min=0))
+    area2 = ((x2_2 - x1_2).clamp(min=0) * (y2_2 - y1_2).clamp(min=0))
+
+    # Пересечение
+    lt_x = torch.max(x1_1[:, None], x1_2[None, :])
+    lt_y = torch.max(y1_1[:, None], y1_2[None, :])
+    rb_x = torch.min(x2_1[:, None], x2_2[None, :])
+    rb_y = torch.min(y2_1[:, None], y2_2[None, :])
+
+    inter_w = (rb_x - lt_x).clamp(min=0)
+    inter_h = (rb_y - lt_y).clamp(min=0)
+    inter = inter_w * inter_h
+
+    union = area1[:, None] + area2[None, :] - inter
+    eps = 1e-7
+    iou = inter / (union + eps)
+    return iou.clamp(min=0.0, max=1.0)
 
 
 def simota_assign_per_image(
@@ -172,9 +202,8 @@ def simota_assign_per_image(
         return assigned_gt_ids, assigned_labels
 
     # IoU cost for cost matrix. Shape is (M_box, K).
-    ious = box_iou(gt_boxes, valid_decoded_boxes)
+    ious = safe_box_iou(gt_boxes, valid_decoded_boxes)
     iou_cost = -torch.log(ious + 1e-7)
-
 
     # CE cost for cost matrix. Shape is (M_box, K)
     gt_onehot_label = one_hot(gt_labels.long(), num_classes)    # (M_box, n_cls)

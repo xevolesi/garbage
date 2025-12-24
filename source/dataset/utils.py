@@ -1,7 +1,16 @@
 import typing as ty
 
 import cv2
+import pandas as pd
 import albumentations as album
+
+from ..config import Config
+
+
+def train_val_test_split(config:Config, dataframe: pd.DataFrame) -> dict[str, pd.DataFrame]:
+    train_df = dataframe.query(f"fold in {config.dataset.train_folds}").reset_index(drop=True)
+    val_df = dataframe.query(f"fold in {config.dataset.train_folds}").reset_index(drop=True)
+    return {"train": train_df, "val_df": val_df}
 
 
 def get_transforms(subset: ty.Literal["val", "train"]) -> album.Compose:

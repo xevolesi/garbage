@@ -1,0 +1,13 @@
+path:
+  run_name: null
+  base_dataset_folder: C:\Projects\yunet_pytorch\data\widerface
+  artifacts_folder: artifacts
+  csv_name: widerface_main_2.csv
+
+dataset:
+  train_folds: [0, 1, 2, 3]
+  val_folds: [4]
+
+
+hyperparams:
+  seed: 2025

@@ -8,3 +8,5 @@ albumentations
 jupyter
 matplotlib
 seaborn
+
+names-generator==0.2.0

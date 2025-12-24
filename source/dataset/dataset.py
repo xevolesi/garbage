@@ -150,9 +150,9 @@ def build_dataloaders(
         )
         dataloaders[subset] = DataLoader(
             dataset,
-            batch_size=8,
+            batch_size=32,
             shuffle=subset=="train",
-            num_workers=0,
+            num_workers=6,
             generator=generator,
             collate_fn=detection_collate_fn
         )
