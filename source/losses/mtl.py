@@ -18,7 +18,7 @@ class DetectionLoss(nn.Module):
         self.box_weight = box_weight
         self.kps_weight = kps_weight
         self.clf_crit = nn.BCEWithLogitsLoss(reduction="none")
-        self.kps_crit = nn.SmoothL1Loss(reduction="none")
+        self.kps_crit = nn.SmoothL1Loss(reduction="none", beta=0.1111111111111111)
         self.box_crit = EIoULoss()
     
     def forward(
