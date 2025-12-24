@@ -25,7 +25,8 @@ class DetectionLoss(nn.Module):
         self,
         inputs: tuple[torch.Tensor, ...],
         targets: tuple[torch.Tensor, ...],
-        foreground_mask: torch.Tensor,
+        foreground_mask: torch.Tensor,    
+        priors: torch.Tensor,
     ) -> dict[str, torch.Tensor]:
         input_objs, input_cls, input_boxes, input_kps = inputs
         target_objs, target_cls, target_boxes, target_kps = targets
@@ -33,7 +34,7 @@ class DetectionLoss(nn.Module):
         # Let N = N_priors_level1 + ... + N_priors_level_m.
         # Then input_objs, target_objs have (B, N) shape.
         obj_loss = self.clf_crit(input_objs, target_objs)
-        obj_loss = obj_loss.sum(dim=1) # (B,)
+        obj_loss = obj_loss.mean(dim=1) # (B,)
         obj_loss = self.obj_weight * obj_loss.mean()
 
         cls_loss = self.clf_crit(input_cls, target_cls) # (B, N, 1).
@@ -47,11 +48,20 @@ class DetectionLoss(nn.Module):
         box_loss = self.box_crit(input_boxes, target_boxes) # (K,).
         box_loss = self.box_weight * box_loss.mean()
 
-        input_kps = input_kps[foreground_mask] # (K, 10)
-        target_kps = target_kps[foreground_mask] # (K, 10)
-        valid_kps = target_kps.ne(-1.0) # (K, 10)
-        kps_loss = self.kps_crit(input_kps, target_kps) * valid_kps
-        kps_loss = self.kps_weight * kps_loss.sum() / valid_kps.sum().clamp_min(1)
+        # priors: (B, N, 4) -> (K, 4) для тех же foreground позиций
+        priors_fg = priors[foreground_mask]          # (K, 4)
+        input_kps = input_kps[foreground_mask]       # (K, 10)
+        target_kps = target_kps[foreground_mask]     # (K, 10) в пикселях
+        valid_kps = target_kps.ne(-1.0)              # (K, 10)
+        if valid_kps.any():
+            # Кодируем только валидные таргеты, но проще закодировать всё и маской вырезать
+            encoded_target_kps = self._encode_keypoints(priors_fg, target_kps)  # (K, 10)
+
+            kps_loss_raw = self.kps_crit(input_kps, encoded_target_kps)  # (K, 10)
+            kps_loss = (kps_loss_raw * valid_kps).sum() / valid_kps.sum().clamp_min(1)
+            kps_loss = self.kps_weight * kps_loss
+        else:
+            kps_loss = input_kps.sum() * 0.0
 
         total_loss = obj_loss + cls_loss + box_loss + kps_loss
         return {
@@ -61,3 +71,14 @@ class DetectionLoss(nn.Module):
             "box_loss": box_loss,
             "kps_loss": kps_loss,
         }
+
+    def _encode_keypoints(self, priors: torch.Tensor, kps: torch.Tensor) -> torch.Tensor:
+        # priors: (K, 4) [cx, cy, sx, sy]
+        # kps:    (K, 2*num_points) в пикселях
+        num_points = kps.shape[-1] // 2
+        encoded = []
+        for i in range(num_points):
+            kp_xy = kps[:, [2*i, 2*i+1]]         # (K, 2)
+            enc_xy = (kp_xy - priors[:, :2]) / priors[:, 2:]
+            encoded.append(enc_xy)
+        return torch.cat(encoded, dim=1)         # (K, 2*num_points)
