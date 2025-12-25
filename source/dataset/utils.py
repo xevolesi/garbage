@@ -2,10 +2,29 @@ import typing as ty
 
 import cv2
 import pandas as pd
+import numpy as np
+from numpy.typing import NDArray
 import albumentations as album
 
 from ..config import Config
 from .transforms import RandomSquareCrop
+
+
+def transform_list_of_coords_to_array(list_of_coords: str, dtype=np.float32) -> NDArray:
+    """
+    Transform '[[x1, y1, x2, y2], ...[x1, y1, x2, y2]]` to NumPy array.
+    Note that function uses `eval` python function so it's not safe.
+
+    Args:
+        list_of_coords: String representation of bounding box list or point list;
+        dtype: Resulting NumPy array data type.
+    
+    Returns:
+        Transformed boudning boxes or points as numpy array.
+        Resulting shape is (N_items_in_list, M_coords_in_item).
+    """
+    arr = np.array(eval(list_of_coords))
+    return arr.astype(dtype)
 
 
 def train_val_test_split(config:Config, dataframe: pd.DataFrame) -> dict[str, pd.DataFrame]:
@@ -23,8 +42,8 @@ def get_transforms(subset: ty.Literal["val", "train"]) -> album.Compose:
                 album.ToFloat(max_value=255, p=1.0),
                 album.pytorch.ToTensorV2(),
             ],
-            bbox_params=album.BboxParams(format="pascal_voc"),
-            keypoint_params=album.KeypointParams(format="xy", remove_invisible=False), 
+            bbox_params=album.BboxParams(format="pascal_voc", label_fields=["box_labels"]),
+            keypoint_params=album.KeypointParams(format="xy", remove_invisible=False, label_fields=["kp_indices"]), 
         )
     elif subset == "train":
         return album.Compose(
@@ -35,8 +54,8 @@ def get_transforms(subset: ty.Literal["val", "train"]) -> album.Compose:
                 album.ToFloat(max_value=255, p=1.0),
                 album.pytorch.ToTensorV2(),
             ],
-            bbox_params=album.BboxParams(format="pascal_voc"),
-            keypoint_params=album.KeypointParams(format="xy", remove_invisible=False), 
+            bbox_params=album.BboxParams(format="pascal_voc", label_fields=["box_labels"]),
+            keypoint_params=album.KeypointParams(format="xy", remove_invisible=False, label_fields=["kp_indices"]), 
         )
     else:
         msg = f"Invalid `subset` argument. Expected one of ('train', 'val'), but got {subset}"
