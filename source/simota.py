@@ -1,29 +1,5 @@
 import torch
-from torchvision.ops import box_iou
 from torch.nn.functional import one_hot, binary_cross_entropy
-
-
-def is_in(points: torch.Tensor, boxes: torch.Tensor) -> torch.Tensor:
-    """
-    Check if points lies insde boxes. Vectorized variant.
-
-    Args:
-        points: (X, Y) points with shape (N, 2);
-        boxes: Boxes with shape (M, 4) in
-            [topl_left_x, top_left_y, bot_right_x, bot_right_y] format.
-    
-    Returns: (M, N) inclustion matrix C where c_ij is a bool value showing
-        that j-th point lies inside the i-th box.
-    """
-    # [:, None, :2] to abuse broadcasting.
-    top_left_points = boxes[:, None, :2]
-    bot_right_points = boxes[:, None, 2:]
-    min_distances = torch.cat(
-        [points - top_left_points, bot_right_points - points], dim=-1
-    ).min(dim=-1).values
-    # If min distance from all 4 edges of the box to center point is grater then 0.0
-    # than center point are strictly inside the box.
-    return torch.gt(min_distances, 0.0)
 
 
 def are_priors_in_gts(
@@ -42,26 +18,41 @@ def are_priors_in_gts(
         Inclusion matrix C (M, N) where c_ij is a bool value showing that
             j-th prior lies inside the i-th GT box.
     """
-    return is_in(priors[:, :2], gt_boxes)
+    points = priors[:, :2]  # (N, 2)
+    top_left = gt_boxes[:, None, :2]   # (M, 1, 2)
+    bot_right = gt_boxes[:, None, 2:]  # (M, 1, 2)
+    min_distances = torch.cat(
+        [points - top_left, bot_right - points], dim=-1
+    ).min(dim=-1).values
+    return torch.gt(min_distances, 0.0)  # (M, N)
 
 
 def are_priors_in_gts_center(
     priors: torch.Tensor, gt_boxes: torch.Tensor, r: float = 0.5
 ) -> torch.Tensor:
+    """
+    Check if priors lies inside the U(b, r * stride), U is defined as L1-ball.
+
+    Args:
+        priors: Grid priors with shape (N, 4) in
+            [center_x, center_y, stride_w, stride_h] format;
+        gt_boxes: GT boxes with shape (M, 4) in
+            [top_left_x, top_left_y, bot_right_x, bot_right_y] format;
+        r: B1 ball radius coefficient. Actual radius will be
+            (r * stride_w, r * stride_h).
+
+    Return:
+        Inclusion matrix C with shape (M, N) where c_ij is a bool value showing that
+            j-th prior lies inside the i-th GT box center U.
+    """
     num_gt = gt_boxes.size(0)
     num_priors = priors.size(0)
     
     gt_centers = 0.5 * (gt_boxes[:, 2:] + gt_boxes[:, :2])  # (M, 2)
-    
-    # Используем stride для КАЖДОГО prior!
     repeated_stride = priors[:, 2:].unsqueeze(1).repeat(1, num_gt, 1)  # (N, M, 2)
     gt_centers = gt_centers.unsqueeze(0).repeat(num_priors, 1, 1)  # (N, M, 2)
-    
-    # Создаем center boxes
     center_boxes_min = gt_centers - r * repeated_stride  # (N, M, 2)
     center_boxes_max = gt_centers + r * repeated_stride  # (N, M, 2)
-    
-    # Проверяем включение для каждой пары (prior, gt)
     priors_xy = priors[:, :2].unsqueeze(1)  # (N, 1, 2)
     is_in_center = (
         (priors_xy >= center_boxes_min).all(dim=-1) &
@@ -69,6 +60,7 @@ def are_priors_in_gts_center(
     )  # (N, M)
     
     return is_in_center.t()  # (M, N) для совместимости с твоим форматом
+
 
 def compute_inclusion_masks(
         priors: torch.Tensor, gt_boxes: torch.Tensor, r: float,
