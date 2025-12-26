@@ -21,6 +21,10 @@ class TrainingConfig(BaseModel):
     batch_size: int
     num_workers: int
     pin_memory: bool
+    lr: float
+    momentum: float
+    weight_decay: float
+    epochs: int
 
 
 class ModelConfig(BaseModel):
