@@ -48,16 +48,17 @@ class DetectionLoss(nn.Module):
         box_loss = self.box_crit(input_boxes, target_boxes) # (K,).
         box_loss = self.box_weight * box_loss.mean()
 
-        # priors: (B, N, 4) -> (K, 4) для тех же foreground позиций
-        priors_fg = priors[foreground_mask]          # (K, 4)
-        input_kps = input_kps[foreground_mask]       # (K, 10)
-        target_kps = target_kps[foreground_mask]     # (K, 10) в пикселях
-        valid_kps = target_kps.ne(-1.0)              # (K, 10)
-        if valid_kps.any():
+        if foreground_mask.any():
+            # priors: (B, N, 4) -> (K, 4) для тех же foreground позиций
+            priors_fg = priors[foreground_mask]          # (K, 4)
+            input_kps = input_kps[foreground_mask]       # (K, 10)
+            target_kps = target_kps[foreground_mask]     # (K, 10) в пикселях
+
             # Кодируем только валидные таргеты, но проще закодировать всё и маской вырезать
             encoded_target_kps = self._encode_keypoints(priors_fg, target_kps)  # (K, 10)
-
             kps_loss_raw = self.kps_crit(input_kps, encoded_target_kps)  # (K, 10)
+            valid_kps = target_kps.ne(-1.0)
+
             kps_loss = (kps_loss_raw * valid_kps).sum() / valid_kps.sum().clamp_min(1)
             kps_loss = self.kps_weight * kps_loss
         else:

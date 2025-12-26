@@ -1,3 +1,4 @@
+import typing as ty
 from pydantic import BaseModel
 
 
@@ -5,19 +6,42 @@ class PathConfig(BaseModel):
     run_name: str | None = None
     base_dataset_folder: str
     artifacts_folder: str
-    csv_name: str
+    csv: str
 
 
 class DatasetConfig(BaseModel):
-    train_folds: list[int]
-    val_folds: list[int]
+    image_path_col: str
+    boxes_col: str
+    key_points_col: str
 
 
-class HyperparamsConfig(BaseModel):
+class TrainingConfig(BaseModel):
+    device: str
     seed: int
+    batch_size: int
+    num_workers: int
+    pin_memory: bool
+
+
+class ModelConfig(BaseModel):
+    num_classes: int
+    num_keypoints: int
+
+
+class Transform(BaseModel):
+    name: str
+    p: float
+    kwargs: dict[str, ty.Any]
+
+
+class TransformsConfig(BaseModel):
+    transforms: list[Transform]
 
 
 class Config(BaseModel):
     path: PathConfig
     dataset: DatasetConfig
-    hyperparams: HyperparamsConfig
+    training: TrainingConfig
+    model: ModelConfig
+    train_transforms: TransformsConfig
+    val_transforms: TransformsConfig

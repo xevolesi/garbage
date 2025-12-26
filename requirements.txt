@@ -8,5 +8,6 @@ albumentations
 jupyter
 matplotlib
 seaborn
-
+pandas
+pandas-stubs
 names-generator==0.2.0
