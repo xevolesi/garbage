@@ -1,3 +1,3 @@
-from .dataset import build_dataloaders, DataPoint
+from .dataset import build_dataloaders, DataPoint, CSVDetectionDataset
 
-__all__ = ["build_dataloaders", "DataPoint"]
+__all__ = ["build_dataloaders", "DataPoint", "CSVDetectionDataset"]
