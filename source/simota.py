@@ -48,26 +48,27 @@ def are_priors_in_gts(
 def are_priors_in_gts_center(
     priors: torch.Tensor, gt_boxes: torch.Tensor, r: float = 0.5
 ) -> torch.Tensor:
-    """
-    Check if priors lies inside the U(b, r * stride), U is defined as L1-ball.
-
-    Args:
-        priors: Grid priors with shape (N, 4) in
-            [center_x, center_y, stride_w, stride_h] format;
-        gt_boxes: GT boxes with shape (M, 4) in
-            [top_left_x, top_left_y, bot_right_x, bot_right_y] format;
-        r: B1 ball radius coefficient. Actual radius will be
-            (r * stride_w, r * stride_h).
-
-    Return:
-        Inclusion matrix C with shape (M, N) where c_ij is a bool value showing that
-            j-th prior lies inside the i-th GT box center U.
-    """
-    gt_centers = 0.5 * (gt_boxes[:, 2:] + gt_boxes[:, :2])
-    center_rad = r * priors[0, 2:] # This is [stride_w, stride_h] which is the same for all priors.
-    center_boxes = torch.cat([gt_centers - center_rad, gt_centers + center_rad], dim=-1)
-    return are_priors_in_gts(priors, center_boxes)
-
+    num_gt = gt_boxes.size(0)
+    num_priors = priors.size(0)
+    
+    gt_centers = 0.5 * (gt_boxes[:, 2:] + gt_boxes[:, :2])  # (M, 2)
+    
+    # Используем stride для КАЖДОГО prior!
+    repeated_stride = priors[:, 2:].unsqueeze(1).repeat(1, num_gt, 1)  # (N, M, 2)
+    gt_centers = gt_centers.unsqueeze(0).repeat(num_priors, 1, 1)  # (N, M, 2)
+    
+    # Создаем center boxes
+    center_boxes_min = gt_centers - r * repeated_stride  # (N, M, 2)
+    center_boxes_max = gt_centers + r * repeated_stride  # (N, M, 2)
+    
+    # Проверяем включение для каждой пары (prior, gt)
+    priors_xy = priors[:, :2].unsqueeze(1)  # (N, 1, 2)
+    is_in_center = (
+        (priors_xy >= center_boxes_min).all(dim=-1) &
+        (priors_xy <= center_boxes_max).all(dim=-1)
+    )  # (N, M)
+    
+    return is_in_center.t()  # (M, N) для совместимости с твоим форматом
 
 def compute_inclusion_masks(
         priors: torch.Tensor, gt_boxes: torch.Tensor, r: float,
