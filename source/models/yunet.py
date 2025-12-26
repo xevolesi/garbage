@@ -7,13 +7,21 @@ from .necks import TinyFPN
 
 
 class YuNet(nn.Module):
-    def __init__(self) -> None:
+    def __init__(self, num_classes: int = 1, num_keypoints: int = 5) -> None:
         super().__init__()
+        self.num_classes = num_classes
+        self.num_keypoints = num_keypoints
         self.backbone = YUNetBackbone()
         self.neck = TinyFPN()
-        self.p8_head = SingleLevelYuNetHead(64)
-        self.p16_head = SingleLevelYuNetHead(64)
-        self.p32_head = SingleLevelYuNetHead(64)
+        self.p8_head = SingleLevelYuNetHead(
+            64, num_classes=self.num_classes, num_keypoints=self.num_keypoints
+        )
+        self.p16_head = SingleLevelYuNetHead(
+            64, num_classes=self.num_classes, num_keypoints=self.num_keypoints
+        )
+        self.p32_head = SingleLevelYuNetHead(
+            64, num_classes=self.num_classes, num_keypoints=self.num_keypoints
+        )
     
     def forward(
         self, tensor: torch.Tensor
