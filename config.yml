@@ -10,6 +10,7 @@ dataset:
   key_points_col: key_points
 
 training:
+  resume_ckpt: artifacts\objective_blackburn\checkpoints\epoch_120_ckpt.pt
   device: cuda:0
   seed: 2025
   batch_size: 16

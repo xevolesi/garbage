@@ -12,14 +12,14 @@ from torch.utils.data import DataLoader
 from source.config import Config
 from source.dataset import build_dataloaders
 
-from source.general import seed_everything, get_cpu_state_dict
+from source.general import seed_everything, get_cpu_state_dict, load_optimizer_state_dict
 from source.models import YuNet
 from source.schedulers import WarmupMultiStepLR
 from source.losses import DetectionLoss
 from source.postprocessing import postprocess_predictions
 from source.targets import generate_targets_batch
 from source.drawing import visualize_epoch_predictions
-
+from source.metrics import calculate_map_torchmetrics
 
 
 def read_config(path: str) -> Config:
@@ -63,7 +63,7 @@ def train_one_epoch(
 def train(config: Config, dataframe: pd.DataFrame):
     device = torch.device(config.training.device)
     dataloaders = build_dataloaders(config, dataframe)
-    model = YuNet(**config.model.model_dump()).to(device)
+    model = YuNet(**config.model.model_dump())
     optimizer = torch.optim.SGD(
         model.parameters(),
         lr=config.training.lr,
@@ -81,23 +81,49 @@ def train(config: Config, dataframe: pd.DataFrame):
     criterion = DetectionLoss(
         obj_weight=1.0, cls_weight=1.0, box_weight=5.0, kps_weight=0.1
     )
-    tb_writer = SummaryWriter(
-        log_dir=os.path.join(config.path.artifacts_folder, "tb_logs")
-    )
-    for epoch in range(config.training.epochs):
+    start_epoch = 0
+    log_dir = os.path.join(config.path.artifacts_folder, "tb_logs")
+    if config.training.resume_ckpt is not None:
+        ckpt = torch.load(config.training.resume_ckpt)
+        start_epoch = ckpt["epoch"] + 1
+        model.load_state_dict(ckpt["model"])
+        load_optimizer_state_dict(optimizer, ckpt["optimizer"], device)
+        scheduler.load_state_dict(ckpt["scheduler"])
+        criterion.load_state_dict(ckpt["criterion"])
+        resume_log_dir = ckpt.get("tb_writer_log_dir")
+        log_dir = resume_log_dir if resume_log_dir is not None else log_dir
+        os.makedirs(log_dir, exist_ok=True)
+
+    model = model.to(device)
+    tb_writer = SummaryWriter(log_dir=log_dir)
+    for epoch in range(start_epoch, config.training.epochs):
         train_losses = train_one_epoch(
             model, dataloaders["train"], optimizer, scheduler, criterion, device
         )
         scheduler.step()
+        metrics = calculate_map_torchmetrics(model, dataloaders["val"], device)
         tb_writer.add_scalars("Losses", train_losses, global_step=epoch)
-        loss_str = ", ".join([f"{loss_name}={loss_value:.4f}" for loss_name, loss_value in train_losses.items()])
-        print(f"[EPOCH {epoch + 1}/{config.training.epochs}] {loss_str}")
+        tb_writer.add_scalars("Metrics", metrics, global_step=epoch)
+        log_str = ", ".join(
+            [
+                f"{loss_name}={loss_value:.4f}"
+                for loss_name, loss_value in train_losses.items()
+            ]
+        )
+        log_str = log_str + " " + ", ".join(
+            [
+                f"{metric_name}={metric_value:.4f}"
+                for metric_name, metric_value in metrics.items()
+            ]
+        )
+        print(f"[EPOCH {epoch + 1}/{config.training.epochs}] {log_str}")
         ckpt = {
             "epoch": epoch,
             "model": get_cpu_state_dict(model.state_dict()),
             "optimizer": optimizer.state_dict(),
             "scheduler": scheduler.state_dict(),
             "criterion": criterion.state_dict(),
+            "tb_writer_log_dir": tb_writer.get_logdir(),
         }
         ckpt_path = os.path.join(config.path.artifacts_folder, "checkpoints")
         os.makedirs(ckpt_path, exist_ok=True)

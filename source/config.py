@@ -16,6 +16,7 @@ class DatasetConfig(BaseModel):
 
 
 class TrainingConfig(BaseModel):
+    resume_ckpt: str
     device: str
     seed: int
     batch_size: int

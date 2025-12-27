@@ -11,6 +11,14 @@ def get_cpu_state_dict(state_dict):
     return {name: tensor.detach().cpu() for name, tensor in state_dict.items()}
 
 
+def load_optimizer_state_dict(optimizer, state_dict, device):
+    optimizer.load_state_dict(state_dict)
+    for state in optimizer.state.values():
+        for k, v in state.items():
+            if isinstance(v, torch.Tensor):
+                state[k] = v.to(device)
+
+
 def seed_everything(config: Config, local_rank: int = 0) -> None:
     """
     Fix all avaliable seeds to ensure reproducibility.
