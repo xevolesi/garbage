@@ -1,4 +1,5 @@
 import typing as ty
+
 from pydantic import BaseModel
 
 
@@ -26,7 +27,6 @@ class TrainingConfig(BaseModel):
     momentum: float
     weight_decay: float
     epochs: int
-    start_kp_training_from: int
     eval_interval: int
 
 

@@ -1,31 +1,29 @@
+import argparse as ap
 import os
 import time
-import argparse as ap
 from collections import defaultdict
 
-import yaml
-import torch
 import pandas as pd
-from torch.utils.tensorboard import SummaryWriter
+import torch
+import yaml
 from names_generator import generate_name
 from torch.utils.data import DataLoader
+from torch.utils.tensorboard import SummaryWriter
 
 from source.config import Config
 from source.dataset import build_dataloaders
-
+from source.drawing import visualize_epoch_predictions
 from source.general import (
-    seed_everything,
     get_cpu_state_dict,
     load_optimizer_state_dict,
+    seed_everything,
 )
-from source.models import YuNet
-from source.schedulers import WarmupMultiStepLR
 from source.losses import DetectionLoss
-from source.postprocessing import postprocess_predictions
-from source.targets import generate_targets_batch
-from source.drawing import visualize_epoch_predictions
 from source.metrics import calculate_map_torchmetrics
-
+from source.models import YuNet
+from source.postprocessing import postprocess_predictions
+from source.schedulers import WarmupMultiStepLR
+from source.targets import generate_targets_batch
 
 # Set benchmark to True and deterministic to False
 # if you want to speed up training with less level of reproducibility.
@@ -107,7 +105,7 @@ def train(config: Config, dataframe: pd.DataFrame):
         warmup_by_epoch=False,
     )
     criterion = DetectionLoss(
-        obj_weight=1.0, cls_weight=1.0, box_weight=5.0, kps_weight=0.0
+        obj_weight=1.0, cls_weight=1.0, box_weight=5.0, kps_weight=0.1
     )
     start_epoch = 0
     log_dir = os.path.join(config.path.artifacts_folder, "tb_logs")
@@ -125,8 +123,6 @@ def train(config: Config, dataframe: pd.DataFrame):
     model = model.to(device)
     tb_writer = SummaryWriter(log_dir=log_dir)
     for epoch in range(start_epoch, config.training.epochs):
-        if epoch == config.training.start_kp_training_from:
-            criterion.kps_weight = 0.1
         train_start_time = time.perf_counter()
         train_losses = train_one_epoch(
             model, dataloaders["train"], optimizer, scheduler, criterion, device

@@ -20,10 +20,9 @@ training:
   lr: 0.01
   momentum: 0.9
   weight_decay: 0.0005
-  epochs: 640
+  epochs: 1
 
   eval_interval: 1 # Perform mAP calculation and predictions logging every 1 epochs.
-  start_kp_training_from: 101 # Start key points training from 101 epoch.
 
 model:
   num_classes: 1
