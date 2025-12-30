@@ -1,3 +1,6 @@
+import random
+
+import torch
 import numpy as np
 from numpy.typing import NDArray
 
@@ -15,3 +18,9 @@ def get_transforms(config: Config) -> dict[str, AugmentationPipeline]:
         "train": AugmentationPipeline(config.train_transforms),
         "val": AugmentationPipeline(config.val_transforms)
     }
+
+
+def seed_worker(worker_id: int) -> None:
+    worker_seed = torch.initial_seed() % 2**32
+    np.random.seed(worker_seed)
+    random.seed(worker_seed)

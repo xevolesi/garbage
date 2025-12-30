@@ -10,7 +10,7 @@ from numpy.typing import NDArray
 import torch
 from torch.utils.data import Dataset, DataLoader
 
-from .utils import get_transforms, transform_list_of_coords_to_array
+from .utils import get_transforms, transform_list_of_coords_to_array, seed_worker
 from .transforms import AugmentationPipeline
 from ..config import Config
 
@@ -127,6 +127,9 @@ def build_dataloaders(
             num_workers=config.training.num_workers,
             pin_memory=config.training.pin_memory,
             generator=generator,
-            collate_fn=detection_collate_fn
+            collate_fn=detection_collate_fn,
+            persistent_workers=True,
+            # https://docs.pytorch.org/docs/stable/notes/randomness.html
+            worker_init_fn=seed_worker,
         )
     return dataloaders
