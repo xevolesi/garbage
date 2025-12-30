@@ -106,7 +106,7 @@ def visualize_epoch_predictions(
     canvas = np.vstack((first_row, second_row))
     path = os.path.join(base_dir, f"epoch_{epoch}")
     os.makedirs(path, exist_ok=True)
-    path = os.path.join(path, f"random_predictions.png")
+    path = os.path.join(path, "random_predictions.png")
     cv2.imwrite(path, canvas)
 
 
