@@ -1,5 +1,3 @@
-import typing as ty
-
 import torch
 from torch import nn
 
