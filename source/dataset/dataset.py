@@ -25,11 +25,18 @@ class DataPoint(ty.TypedDict):
 class CSVDetectionDataset(Dataset):
     def __init__(
         self,
+        subset: ty.Literal["train", "val"],
         config: Config,
         dataframe: pd.DataFrame,
         transforms: AugmentationPipeline | None = None,
     ) -> None:
-        self.image_dir = config.path.base_dataset_folder
+        self.subset = subset
+        self.image_dir = os.path.join(
+            config.path.base_dataset_folder,
+            f"WIDER_{subset}",
+            f"WIDER_{subset}",
+            "images",
+        )
         self.images = dataframe[config.dataset.image_path_col].apply(
             lambda path: os.path.join(self.image_dir, path)
         ).to_numpy()
@@ -112,7 +119,7 @@ def build_dataloaders(
     dataloaders = {}
     for subset in ("train", "val"):
         subset_df = dataframe.query(f"subset == '{subset}'").reset_index(drop=True)
-        dataset = CSVDetectionDataset(config, subset_df, transforms[subset])
+        dataset = CSVDetectionDataset(subset, config, subset_df, transforms[subset])
         dataloaders[subset] = DataLoader(
             dataset,
             batch_size=config.training.batch_size,
