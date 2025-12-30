@@ -39,10 +39,6 @@ def calculate_map_torchmetrics(
         gt_boxes = [
             box.to(device, non_blocking=True) for box in batch["boxes"]
         ]
-        gt_kps = [
-            kp_set.to(device, non_blocking=True)
-            for kp_set in batch["key_points"]
-        ]
         gt_labels = [
             bl.to(device, non_blocking=True) for bl in batch["box_labels"]
         ]
