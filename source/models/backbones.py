@@ -2,25 +2,31 @@ import torch
 from torch import nn
 
 from .blocks import DepthWiseBlock, Stem
+from .utils import initialize_weights
 
 
 class YUNetBackbone(nn.Module):
     """
     YuNet backbone matching the authors' libfacedetection implementation.
-    
+
     Architecture follows: downsample_idx=[0, 2, 3, 4], out_idx=[3, 4, 5]
     - model0 (Stem) → MaxPool
-    - model1 (block) 
+    - model1 (block)
     - model2 (block) → MaxPool
     - model3 (block) → OUTPUT p8 → MaxPool
     - model4 (block) → OUTPUT p16 → MaxPool
     - model5 (block) → OUTPUT p32
     """
-    
+
     def __init__(
         self,
         channels: tuple[tuple[int, int, int] | tuple[int, int], ...] = (
-            (3, 16, 16), (16, 64), (64, 64), (64, 64), (64, 64), (64, 64)
+            (3, 16, 16),
+            (16, 64),
+            (64, 64),
+            (64, 64),
+            (64, 64),
+            (64, 64),
         ),
     ) -> None:
         super().__init__()
@@ -35,51 +41,38 @@ class YUNetBackbone(nn.Module):
         self.model3 = DepthWiseBlock(*self.channels[3])
         self.model4 = DepthWiseBlock(*self.channels[4])
         self.model5 = DepthWiseBlock(*self.channels[5])
-        
+
         # Pooling layers for downsampling (matching downsample_idx=[0, 2, 3, 4])
         self.pool0 = nn.MaxPool2d(2, 2)  # after model0
         self.pool2 = nn.MaxPool2d(2, 2)  # after model2
         self.pool3 = nn.MaxPool2d(2, 2)  # after model3
         self.pool4 = nn.MaxPool2d(2, 2)  # after model4
-        
-        self.init_weights()
+
+        initialize_weights(self)
 
     def forward(
-        self,
-        tensor: torch.Tensor
+        self, tensor: torch.Tensor
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         # model0 → pool (downsample_idx=0)
         tensor = self.model0(tensor)
         tensor = self.pool0(tensor)
-        
+
         # model1 (no pool)
         tensor = self.model1(tensor)
-        
+
         # model2 → pool (downsample_idx=2)
         tensor = self.model2(tensor)
         tensor = self.pool2(tensor)
-        
+
         # model3 → output p8 → pool (downsample_idx=3)
         p8_tensor = self.model3(tensor)
         tensor = self.pool3(p8_tensor)
-        
+
         # model4 → output p16 → pool (downsample_idx=4)
         p16_tensor = self.model4(tensor)
         tensor = self.pool4(p16_tensor)
-        
+
         # model5 → output p32 (no pool after)
         p32_tensor = self.model5(tensor)
-        
-        return p8_tensor, p16_tensor, p32_tensor
 
-    def init_weights(self) -> None:
-        for m in self.modules():
-            if isinstance(m, nn.Conv2d):
-                if m.bias is not None:
-                    nn.init.xavier_normal_(m.weight.data)
-                    m.bias.data.fill_(0.02)
-                else:
-                    m.weight.data.normal_(0, 0.01)
-            elif isinstance(m, nn.BatchNorm2d):
-                m.weight.data.fill_(1)
-                m.bias.data.zero_()
+        return p8_tensor, p16_tensor, p32_tensor

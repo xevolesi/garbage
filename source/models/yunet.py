@@ -22,7 +22,7 @@ class YuNet(nn.Module):
         self.p32_head = SingleLevelYuNetHead(
             64, num_classes=self.num_classes, num_keypoints=self.num_keypoints
         )
-    
+
     def forward(
         self, tensor: torch.Tensor
     ) -> tuple[
@@ -31,7 +31,7 @@ class YuNet(nn.Module):
         tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor],
     ]:
         feature_maps = self.backbone(tensor)
-        p8_tensor , p16_tensor , p32_tensor = self.neck(feature_maps)
+        p8_tensor, p16_tensor, p32_tensor = self.neck(feature_maps)
         p8_predictions = self.p8_head(p8_tensor)
         p16_predictions = self.p16_head(p16_tensor)
         p32_predictions = self.p32_head(p32_tensor)
