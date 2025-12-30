@@ -28,7 +28,7 @@ def generate_priors_for_stride(
         offset: Optional offset for grid centers;
         map_size: Spatial shape of feature map;
         device: PyTorch device object.
-    
+
     Returns:
         Regular grid for stride output with shape (B, N_priors, 4) in
         [center_x, center_y, stride_w, stride_h].
@@ -47,8 +47,7 @@ def generate_priors_for_stride(
     stride_w = torch.full((fm_w * fm_h,), stride_w, device=device, dtype=shift_xx.dtype)
     stride_h = torch.full((fm_h * fm_w,), stride_h, device=device, dtype=shift_yy.dtype)
     return torch.stack(
-        [shift_xx.reshape(-1), shift_yy.reshape(-1), stride_w, stride_h],
-        dim=-1
+        [shift_xx.reshape(-1), shift_yy.reshape(-1), stride_w, stride_h], dim=-1
     )
 
 
@@ -61,21 +60,19 @@ def decode_boxes(grids: torch.Tensor, box_logits: torch.Tensor) -> torch.Tensor:
     Args:
         grids: Grids from all strides with shape (B, N_priors, 4);
         box_logits: Predicted logits for boxes with shape (B, N_priors, 4).
-    
+
     Returns:
         Decoded boxes with shape (B, N_priors, 4).
     """
     xys = (box_logits[..., :2] * grids[..., 2:]) + grids[..., :2]
     whs = box_logits[..., 2:].exp() * grids[..., 2:]
 
-    top_left_x = (xys[..., 0] - whs[..., 0] / 2)
-    top_left_y = (xys[..., 1] - whs[..., 1] / 2)
-    bottom_right_x = (xys[..., 0] + whs[..., 0] / 2)
-    bottom_right_y = (xys[..., 1] + whs[..., 1] / 2)
+    top_left_x = xys[..., 0] - whs[..., 0] / 2
+    top_left_y = xys[..., 1] - whs[..., 1] / 2
+    bottom_right_x = xys[..., 0] + whs[..., 0] / 2
+    bottom_right_y = xys[..., 1] + whs[..., 1] / 2
 
-    return torch.stack(
-        [top_left_x, top_left_y, bottom_right_x, bottom_right_y], -1
-    )
+    return torch.stack([top_left_x, top_left_y, bottom_right_x, bottom_right_y], -1)
 
 
 def postprocess_predictions(
@@ -84,7 +81,7 @@ def postprocess_predictions(
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
     """
     Postprocess raw models' predictions to appropriate shape.
-    
+
     Args:
         obj_logits_stages: Objectness logits list from all pyramid levels.
             Shapes are (B, 1, image_h / stride, image_w / stride);
@@ -95,7 +92,7 @@ def postprocess_predictions(
         kps_logits_stages: Keypoints logits list from all pyramid levels.
             Shapes are (B, 10, image_h / stride, image_w / stride).
         strides: Output strides, e.g 2^(pyramid_level_idx) = (8, 16, 32, ...).
-    
+
     Returns:
         Postprocessed objectness-, class-, box- and keypoints-logits and
         generated priors. Note that each postprocess item are single tensor,
@@ -126,12 +123,16 @@ def postprocess_predictions(
     # 80 * 80 = 1600 priors for this pyramid level. Same stands for other
     # pyramid levels. So, for our example actual priors shape for all
     # pyramid levels will be (B, 80*80 + 40*40 + 20*20, 4) = (B, 8400, 4).
-    priors = torch.cat(
-        [
-            generate_priors_for_stride(stride, 0.0, size, device)
-            for stride, size in zip(strides, fm_sizes, strict=True)
-        ]
-    ).unsqueeze(0).repeat(n_images, 1, 1)
+    priors = (
+        torch.cat(
+            [
+                generate_priors_for_stride(stride, 0.0, size, device)
+                for stride, size in zip(strides, fm_sizes, strict=True)
+            ]
+        )
+        .unsqueeze(0)
+        .repeat(n_images, 1, 1)
+    )
 
     # Move channels to last dimension, reshape and concat for all pyramid
     # levels. Our goal is to get similar to priors shape, since for each
@@ -139,7 +140,7 @@ def postprocess_predictions(
     # obj_logits: (B, N_priors_level_1 + N_priors_level_2 + ... N_priors_level_m)
     # cls_logits: (B, N_priors_level_1 + N_priors_level_2 + ... N_priors_level_m, 1)
     # box_logits: (B, N_priors_level_1 + N_priors_level_2 + ... N_priors_level_m, 4)
-    # kps_logits: (B, N_priors_level_1 + N_priors_level_2 + ... N_priors_level_m, 10) 
+    # kps_logits: (B, N_priors_level_1 + N_priors_level_2 + ... N_priors_level_m, 10)
     perm_size = (0, 2, 3, 1)
     obj_logits = permute_reshape_concat(
         obj_logits_pyramids, perm_size, (n_images, -1), 1

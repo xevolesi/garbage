@@ -13,7 +13,11 @@ from torch.utils.data import DataLoader
 from source.config import Config
 from source.dataset import build_dataloaders
 
-from source.general import seed_everything, get_cpu_state_dict, load_optimizer_state_dict
+from source.general import (
+    seed_everything,
+    get_cpu_state_dict,
+    load_optimizer_state_dict,
+)
 from source.models import YuNet
 from source.schedulers import WarmupMultiStepLR
 from source.losses import DetectionLoss
@@ -55,11 +59,24 @@ def train_one_epoch(
         boxes = [item.to(device, non_blocking=True) for item in batch["boxes"]]
         kps = [item.to(device, non_blocking=True) for item in batch["key_points"]]
         p8_out, p16_out, p32_out = model(images)
-        obj_preds, cls_preds, box_preds, kps_preds, grids = postprocess_predictions((p8_out, p16_out, p32_out), (8, 16, 32))
-        foreground_mask, target_cls, target_obj, target_boxes, target_kps, kps_weights = generate_targets_batch(obj_preds, cls_preds, box_preds, grids, boxes, kps, device)
+        obj_preds, cls_preds, box_preds, kps_preds, grids = postprocess_predictions(
+            (p8_out, p16_out, p32_out), (8, 16, 32)
+        )
+        (
+            foreground_mask,
+            target_cls,
+            target_obj,
+            target_boxes,
+            target_kps,
+            kps_weights,
+        ) = generate_targets_batch(
+            obj_preds, cls_preds, box_preds, grids, boxes, kps, device
+        )
         targets = (target_obj, target_cls, target_boxes, target_kps, kps_weights)
         inputs = (obj_preds, cls_preds, box_preds, kps_preds)
-        loss_dict: dict[str, torch.Tensor] = criterion(inputs, targets, foreground_mask, grids)
+        loss_dict: dict[str, torch.Tensor] = criterion(
+            inputs, targets, foreground_mask, grids
+        )
         loss = loss_dict["total_loss"]
         loss.backward()
         optimizer.step()
@@ -134,9 +151,7 @@ def train(config: Config, dataframe: pd.DataFrame):
         tb_writer.add_scalars("Metrics", metrics, global_step=epoch)
         for metric_name, metric_value in metrics.items():
             tb_writer.add_scalar(metric_name, metric_value, epoch)
-        tb_writer.add_scalar(
-            "LR", optimizer.param_groups[0]["lr"], global_step=epoch
-        )
+        tb_writer.add_scalar("LR", optimizer.param_groups[0]["lr"], global_step=epoch)
 
         log_str = ", ".join(
             [
@@ -144,11 +159,15 @@ def train(config: Config, dataframe: pd.DataFrame):
                 for loss_name, loss_value in train_losses.items()
             ]
         )
-        log_str = log_str + " " + ", ".join(
-            [
-                f"{metric_name}={metric_value:.4f}"
-                for metric_name, metric_value in metrics.items()
-            ]
+        log_str = (
+            log_str
+            + " "
+            + ", ".join(
+                [
+                    f"{metric_name}={metric_value:.4f}"
+                    for metric_name, metric_value in metrics.items()
+                ]
+            )
         )
         log_str = log_str + f", Time: {train_time:.2f}s"
         print(f"[EPOCH {epoch + 1}/{config.training.epochs}] {log_str}")
@@ -183,11 +202,7 @@ def main(args: ap.Namespace) -> None:
 if __name__ == "__main__":
     parser = ap.ArgumentParser()
     parser.add_argument(
-        "--config",
-        "-c",
-        type=str,
-        required=True,
-        help="Path to configuration file"
+        "--config", "-c", type=str, required=True, help="Path to configuration file"
     )
     args = parser.parse_args()
     main(args)

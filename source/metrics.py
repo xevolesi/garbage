@@ -1,4 +1,3 @@
-
 import torch
 
 from torchvision.ops import nms
@@ -9,9 +8,7 @@ from .postprocessing import postprocess_predictions
 from source.models.yunet import YuNet
 
 
-def decode_keypoints(
-    kps_preds: torch.Tensor, grids: torch.Tensor
-) -> torch.Tensor:
+def decode_keypoints(kps_preds: torch.Tensor, grids: torch.Tensor) -> torch.Tensor:
     num_points = kps_preds.shape[-1] // 2
     decoded = []
     for i in range(num_points):
@@ -28,23 +25,17 @@ def calculate_map_torchmetrics(
     device: torch.device,
     conf_thresh: float = 0.02,
     iou_thresh: float = 0.45,
-    metric_names: tuple[str, ...] = (
-        "map_50", "map_small", "map_medium", "map_large"
-    ),
+    metric_names: tuple[str, ...] = ("map_50", "map_small", "map_medium", "map_large"),
 ) -> dict[str, float]:
     model.eval()
     map_calculator = MeanAveragePrecision(backend="faster_coco_eval").to(device)
     for batch in dataloader:
         images = batch["image"].to(device, non_blocking=True)
-        gt_boxes = [
-            box.to(device, non_blocking=True) for box in batch["boxes"]
-        ]
-        gt_labels = [
-            bl.to(device, non_blocking=True) for bl in batch["box_labels"]
-        ]
+        gt_boxes = [box.to(device, non_blocking=True) for box in batch["boxes"]]
+        gt_labels = [bl.to(device, non_blocking=True) for bl in batch["box_labels"]]
         p8_out, p16_out, p32_out = model(images)
-        obj_preds, cls_preds, box_preds, kp_preds, priors = (
-            postprocess_predictions((p8_out, p16_out, p32_out), (8, 16, 32))
+        obj_preds, cls_preds, box_preds, kp_preds, priors = postprocess_predictions(
+            (p8_out, p16_out, p32_out), (8, 16, 32)
         )
         batch_size = images.shape[0]
         conf = (obj_preds.sigmoid() * cls_preds.squeeze(dim=-1).sigmoid()).sqrt()
@@ -71,8 +62,7 @@ def calculate_map_torchmetrics(
                     "boxes": filt_boxes,
                     "scores": filt_conf.view(-1),
                     "labels": torch.zeros(
-                        len(filt_boxes),
-                        dtype=torch.long, device=device
+                        len(filt_boxes), dtype=torch.long, device=device
                     ).view(-1),
                 }
             )
@@ -85,7 +75,4 @@ def calculate_map_torchmetrics(
         name: tensor.detach().cpu().item()
         for name, tensor in map_calculator.compute().items()
     }
-    return {
-        name: value for name, value in metrics.items()
-        if name in metric_names
-    }
+    return {name: value for name, value in metrics.items() if name in metric_names}

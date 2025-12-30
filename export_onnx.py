@@ -53,12 +53,12 @@ def parse_args() -> argparse.Namespace:
 def load_model(checkpoint_path: str | None, device: torch.device) -> YuNet:
     """Load the YuNet model from a checkpoint."""
     model = YuNet(num_classes=1, num_keypoints=5)
-    
+
     if checkpoint_path is not None:
         checkpoint = torch.load(checkpoint_path, map_location=device)
         model.load_state_dict(checkpoint["model"])
     model.eval()
-    
+
     return model
 
 
@@ -71,18 +71,20 @@ def export_onnx(
     """Export the model to ONNX format."""
     height, width = input_size
     dummy_input = torch.randn(1, 3, height, width)
-    
+
     # Define output names matching the model structure
     # Each stride level outputs: obj, cls, box, kps
     output_names = []
     for stride in [8, 16, 32]:
-        output_names.extend([
-            f"obj_{stride}",
-            f"cls_{stride}",
-            f"box_{stride}",
-            f"kps_{stride}",
-        ])
-    
+        output_names.extend(
+            [
+                f"obj_{stride}",
+                f"cls_{stride}",
+                f"box_{stride}",
+                f"kps_{stride}",
+            ]
+        )
+
     torch.onnx.export(
         model,
         dummy_input,
@@ -94,11 +96,11 @@ def export_onnx(
         export_params=True,
         verbose=False,
     )
-    
+
     # Validate the exported model
     onnx_model = onnx.load(output_path)
     onnx.checker.check_model(onnx_model)
-    
+
     print(f"Successfully exported ONNX model to: {output_path}")
     print(f"  Input: input [1, 3, {height}, {width}]")
     print(f"  Outputs: {', '.join(output_names)}")
@@ -111,25 +113,25 @@ def verify_onnx(
 ) -> None:
     """Verify ONNX model output matches PyTorch output."""
     import onnxruntime as ort
-    
+
     height, width = input_size
     test_input = torch.randn(1, 3, height, width)
-    
+
     # PyTorch inference
     model.eval()
     with torch.no_grad():
         pytorch_outputs = model(test_input)
-    
+
     # Flatten PyTorch outputs: ((obj8, cls8, box8, kps8), (obj16, ...), (obj32, ...))
     pytorch_flat = []
     for level_outputs in pytorch_outputs:
         for tensor in level_outputs:
             pytorch_flat.append(tensor.numpy())
-    
+
     # ONNX Runtime inference
     session = ort.InferenceSession(onnx_path, providers=["CPUExecutionProvider"])
     onnx_outputs = session.run(None, {"input": test_input.numpy()})
-    
+
     # Compare outputs
     print("\nVerification Results:")
     all_close = True
@@ -140,29 +142,30 @@ def verify_onnx(
         except AssertionError as e:
             print(f"  Output {i}: ✗ Mismatch - {e}")
             all_close = False
-    
+
     if all_close:
         print("\n✓ All outputs match between PyTorch and ONNX!")
     else:
-        print("\n⚠ Some outputs differ (this may be acceptable due to floating-point precision)")
+        print(
+            "\n⚠ Some outputs differ (this may be acceptable due to floating-point precision)"
+        )
 
 
 def main() -> None:
     args = parse_args()
     device = torch.device("cpu")
-    
+
     print(f"Loading model from: {args.checkpoint}")
     model = load_model(args.checkpoint, device)
-    
+
     input_size = tuple(args.input_size)
     print(f"Exporting with input size: {input_size}")
-    
+
     export_onnx(model, args.output, input_size, args.opset_version)
-    
+
     if args.verify:
         verify_onnx(model, args.output, input_size)
 
 
 if __name__ == "__main__":
     main()
-
