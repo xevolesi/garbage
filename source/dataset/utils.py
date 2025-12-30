@@ -16,7 +16,7 @@ def transform_list_of_coords_to_array(list_of_coords: str, dtype=np.float32) -> 
 def get_transforms(config: Config) -> dict[str, AugmentationPipeline]:
     return {
         "train": AugmentationPipeline(config.train_transforms),
-        "val": AugmentationPipeline(config.val_transforms)
+        "val": AugmentationPipeline(config.val_transforms),
     }
 
 

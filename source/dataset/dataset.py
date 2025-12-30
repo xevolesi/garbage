@@ -37,19 +37,19 @@ class CSVDetectionDataset(Dataset):
             f"WIDER_{subset}",
             "images",
         )
-        self.images = dataframe[config.dataset.image_path_col].apply(
-            lambda path: os.path.join(self.image_dir, path)
-        ).to_numpy()
-
-        to_float32_array = partial(
-            transform_list_of_coords_to_array, dtype=np.float32
+        self.images = (
+            dataframe[config.dataset.image_path_col]
+            .apply(lambda path: os.path.join(self.image_dir, path))
+            .to_numpy()
         )
-        self.boxes = dataframe[config.dataset.boxes_col].apply(
-            to_float32_array
-        ).to_numpy()
-        self.kps = dataframe[config.dataset.key_points_col].apply(
-            to_float32_array
-        ).to_numpy()
+
+        to_float32_array = partial(transform_list_of_coords_to_array, dtype=np.float32)
+        self.boxes = (
+            dataframe[config.dataset.boxes_col].apply(to_float32_array).to_numpy()
+        )
+        self.kps = (
+            dataframe[config.dataset.key_points_col].apply(to_float32_array).to_numpy()
+        )
         self.transforms = transforms
 
     def __len__(self) -> int:
@@ -102,17 +102,20 @@ class CSVDetectionDataset(Dataset):
         }
 
 
-def detection_collate_fn( data: list[dict[str, ty.Any]]) -> dict[str, ty.Any]:
+def detection_collate_fn(data: list[dict[str, ty.Any]]) -> dict[str, ty.Any]:
     images = torch.stack([item["image"] for item in data])
     boxes = [item["boxes"] for item in data]
     kps = [item["key_points"] for item in data]
     box_labels = [item["box_labels"] for item in data]
-    return {"image": images, "boxes": boxes, "box_labels": box_labels, "key_points": kps}
+    return {
+        "image": images,
+        "boxes": boxes,
+        "box_labels": box_labels,
+        "key_points": kps,
+    }
 
 
-def build_dataloaders(
-    config: Config, dataframe: pd.DataFrame
-) -> dict[str, DataLoader]:
+def build_dataloaders(config: Config, dataframe: pd.DataFrame) -> dict[str, DataLoader]:
     generator = torch.Generator()
     generator.manual_seed(config.training.seed)
     transforms = get_transforms(config)
@@ -123,7 +126,7 @@ def build_dataloaders(
         dataloaders[subset] = DataLoader(
             dataset,
             batch_size=config.training.batch_size,
-            shuffle=subset=="train",
+            shuffle=subset == "train",
             num_workers=config.training.num_workers,
             pin_memory=config.training.pin_memory,
             generator=generator,
