@@ -26,7 +26,7 @@ def calculate_map_torchmetrics(
     model: YuNet,
     dataloader: DataLoader,
     device: torch.device,
-    conf_thresh: float = 0.5,
+    conf_thresh: float = 0.02,
     iou_thresh: float = 0.45,
     metric_names: tuple[str, ...] = (
         "map_50", "map_small", "map_medium", "map_large"
