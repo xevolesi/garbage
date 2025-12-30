@@ -3,7 +3,6 @@ torch
 torchvision
 opencv-contrib-python-headless
 numpy
-albumentations
 
 jupyter
 matplotlib
@@ -17,3 +16,5 @@ torchmetrics==1.8.2
 onnx==1.20.0
 onnxruntime==1.23.2
 onnxscript==0.5.7
+
+ruff==0.14.10
