@@ -70,28 +70,31 @@ class DetectionLoss(nn.Module):
         input_objs, input_cls, input_boxes, input_kps = inputs
         target_objs, target_cls, target_boxes, target_kps, kps_weights = targets
 
+        # Compute num_total_samples (number of positive/foreground samples)
+        # This matches author's: num_total_samples = max(reduce_mean(num_pos), 1.0)
+        num_total_samples = foreground_mask.sum().float().clamp_min(1.0)
+
         # ===== OBJECTNESS LOSS =====
-        # Loss for all priors
+        # Loss for all priors, sum reduction, divided by num_total_samples
         obj_loss = self.clf_crit(input_objs, target_objs)  # (B, N)
-        obj_loss = obj_loss.mean()  # scalar
+        obj_loss = obj_loss.sum() / num_total_samples  # scalar
         obj_loss = self.obj_weight * obj_loss
 
         # ===== CLASSIFICATION LOSS =====
-        # Loss only for foreground priors
+        # Loss only for foreground priors, sum reduction, divided by num_total_samples
         cls_loss = self.clf_crit(input_cls, target_cls)  # (B, N, num_classes)
-        fg = foreground_mask.unsqueeze(-1)  # (B, N, 1)
-        cls_loss = cls_loss * fg
-        cls_loss = cls_loss.sum() / fg.sum().clamp_min(1)  # scalar
+        cls_loss = cls_loss[foreground_mask]  # (K, num_classes) - only foreground
+        cls_loss = cls_loss.sum() / num_total_samples  # scalar
         cls_loss = self.cls_weight * cls_loss
 
         # ===== BOUNDING BOX LOSS =====
-        # Loss only for foreground priors
+        # Loss only for foreground priors, sum reduction, divided by num_total_samples
         input_boxes_fg = input_boxes[foreground_mask]  # (K, 4)
         target_boxes_fg = target_boxes[foreground_mask]  # (K, 4)
 
         if input_boxes_fg.numel() > 0:
             box_loss = self.box_crit(input_boxes_fg, target_boxes_fg)  # (K,)
-            box_loss = self.box_weight * box_loss.mean()
+            box_loss = self.box_weight * box_loss.sum() / num_total_samples
         else:
             box_loss = input_boxes.sum() * 0.0  # scalar zero with correct device
 
