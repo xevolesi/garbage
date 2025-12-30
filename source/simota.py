@@ -1,6 +1,5 @@
 import torch
-from torch.nn.functional import one_hot, binary_cross_entropy
-
+from torch.nn.functional import binary_cross_entropy, one_hot
 
 SUPER_LARGE_COST = 100_000
 
@@ -82,6 +81,27 @@ def compute_inclusion_masks(
 
 
 def dynamic_k_matching(cost_matrix: torch.Tensor, ious: torch.Tensor, topk: int = 10):
+    """
+    Perform dynamic k-matching from SimOTA algorithm.
+
+    Note: This implementation uses transposed matrices compared to the original mmdet
+    SimOTAAssigner. Here:
+    - cost_matrix shape: (num_gt, num_valid) - rows are GTs, columns are valid priors
+    - ious shape: (num_gt, num_valid)
+
+    The original mmdet implementation uses (num_valid, num_gt) orientation.
+    The logic is equivalent, with dimension indices adjusted accordingly.
+
+    Args:
+        cost_matrix: Assignment cost matrix, shape (num_gt, num_valid)
+        ious: IoU matrix between GT and valid predictions, shape (num_gt, num_valid)
+        topk: Maximum k for dynamic k selection
+
+    Returns:
+        fg_mask_valid: Foreground mask for valid priors, shape (num_valid,)
+        matched_gt_valid: Matched GT index for each valid prior, shape (num_valid,)
+        matched_ious_valid: IoU with matched GT for foreground priors
+    """
     num_gt, num_valid = cost_matrix.shape
     # Compute dynamic K for each GT box.
     k = min(topk, num_valid)
@@ -165,6 +185,10 @@ def simota_assign_per_image(
     """
     Perform SimOTA algorithm to assign targets to predictions.
 
+    Note: This implementation uses (num_gt, num_valid) matrix orientation, which is
+    transposed compared to the original mmdet SimOTAAssigner that uses
+    (num_valid, num_gt). The logic is equivalent with adjusted dimension indices.
+
     Args:
         cls_probas: Probabilities for predicted boxes with shape (N_box, n_cls);
         priors: Priors for boxes with shape (N_box, 4) in
@@ -174,9 +198,15 @@ def simota_assign_per_image(
         gt_boxes: GT boxes with shape (M_box, 4) in format
             [top_left_x, top_left_y, bot_right_x, bot_right_y];
         gt_labels: GT labels for GT boxes with shape (M_box,);
+        r: Center radius for prior selection. Default: 2.5
+        topk: Max k for dynamic k-matching. Default: 10
+        iou_weight: Weight for IoU cost. Default: 3.0
+        cls_weight: Weight for classification cost. Default: 1.0
 
     Returns:
-        num_gt: Количество
+        assigned_gt_ids: GT index for each prior (-1 if unassigned), shape (N_box,)
+        assigned_labels: Label for each prior (-1 if unassigned), shape (N_box,)
+        matched_ious_valid: IoU values for foreground priors
     """
     num_gt = gt_boxes.size(0)
     num_boxes = boxes_xyxy.size(0)
