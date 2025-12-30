@@ -16,7 +16,7 @@ class DatasetConfig(BaseModel):
 
 
 class TrainingConfig(BaseModel):
-    resume_ckpt: str
+    resume_ckpt: str | None = None
     device: str
     seed: int
     batch_size: int
@@ -26,6 +26,8 @@ class TrainingConfig(BaseModel):
     momentum: float
     weight_decay: float
     epochs: int
+    start_kp_training_from: int
+    eval_interval: int
 
 
 class ModelConfig(BaseModel):

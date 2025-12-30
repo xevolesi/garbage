@@ -1,8 +1,8 @@
 path:
   run_name: null
-  base_dataset_folder: C:\Projects\yunet_pytorch\data\widerface\WIDER_train\WIDER_train\images
+  base_dataset_folder: C:\Projects\yunet_pytorch\data\widerface
   artifacts_folder: artifacts
-  csv: C:\Projects\yunet_pytorch\widerface_main_3.csv
+  csv: C:\Projects\yunet_pytorch\data\widerface\widerface_main_3.csv
 
 dataset:
   image_path_col: image
@@ -10,17 +10,20 @@ dataset:
   key_points_col: key_points
 
 training:
-  resume_ckpt: artifacts\objective_blackburn\checkpoints\epoch_120_ckpt.pt
+  resume_ckpt: null
   device: cuda:0
   seed: 2025
-  batch_size: 16
-  num_workers: 6
+  batch_size: 32
+  num_workers: 8
   pin_memory: true
 
   lr: 0.01
   momentum: 0.9
   weight_decay: 0.0005
   epochs: 640
+
+  eval_interval: 1 # Perform mAP calculation and predictions logging every 1 epochs.
+  start_kp_training_from: 101 # Start key points training from 101 epoch.
 
 model:
   num_classes: 1

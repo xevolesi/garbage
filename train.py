@@ -1,4 +1,5 @@
 import os
+import time
 import argparse as ap
 from collections import defaultdict
 
@@ -20,6 +21,16 @@ from source.postprocessing import postprocess_predictions
 from source.targets import generate_targets_batch
 from source.drawing import visualize_epoch_predictions
 from source.metrics import calculate_map_torchmetrics
+
+
+# Set benchmark to True and deterministic to False
+# if you want to speed up training with less level of reproducibility.
+torch.backends.cudnn.benchmark = False
+torch.backends.cudnn.deterministic = True
+
+# Speed up GEMM if GPU allowed to use TF32.
+torch.backends.cuda.matmul.allow_tf32 = True
+torch.backends.cudnn.allow_tf32 = True
 
 
 def read_config(path: str) -> Config:
@@ -79,7 +90,7 @@ def train(config: Config, dataframe: pd.DataFrame):
         warmup_by_epoch=False,
     )
     criterion = DetectionLoss(
-        obj_weight=1.0, cls_weight=1.0, box_weight=5.0, kps_weight=0.1
+        obj_weight=1.0, cls_weight=1.0, box_weight=5.0, kps_weight=0.0
     )
     start_epoch = 0
     log_dir = os.path.join(config.path.artifacts_folder, "tb_logs")
@@ -97,13 +108,36 @@ def train(config: Config, dataframe: pd.DataFrame):
     model = model.to(device)
     tb_writer = SummaryWriter(log_dir=log_dir)
     for epoch in range(start_epoch, config.training.epochs):
+        if epoch == config.training.start_kp_training_from:
+            criterion.kps_weight = 0.1
+        train_start_time = time.perf_counter()
         train_losses = train_one_epoch(
             model, dataloaders["train"], optimizer, scheduler, criterion, device
         )
+        train_end_time = time.perf_counter()
+        train_time = train_end_time - train_start_time
         scheduler.step()
-        metrics = calculate_map_torchmetrics(model, dataloaders["val"], device)
+        metrics = {}
+        if (epoch + 1) % config.training.eval_interval == 0:
+            metrics = calculate_map_torchmetrics(model, dataloaders["val"], device)
+            visualize_epoch_predictions(
+                config.path.artifacts_folder,
+                epoch,
+                model,
+                next(iter(dataloaders["val"])),
+                device,
+            )
+
         tb_writer.add_scalars("Losses", train_losses, global_step=epoch)
+        for loss_name, loss_value in train_losses.items():
+            tb_writer.add_scalar(loss_name, loss_value, epoch)
         tb_writer.add_scalars("Metrics", metrics, global_step=epoch)
+        for metric_name, metric_value in metrics.items():
+            tb_writer.add_scalar(metric_name, metric_value, epoch)
+        tb_writer.add_scalar(
+            "LR", optimizer.param_groups[0]["lr"], global_step=epoch
+        )
+
         log_str = ", ".join(
             [
                 f"{loss_name}={loss_value:.4f}"
@@ -116,6 +150,7 @@ def train(config: Config, dataframe: pd.DataFrame):
                 for metric_name, metric_value in metrics.items()
             ]
         )
+        log_str = log_str + f", Time: {train_time:.2f}s"
         print(f"[EPOCH {epoch + 1}/{config.training.epochs}] {log_str}")
         ckpt = {
             "epoch": epoch,
@@ -129,19 +164,12 @@ def train(config: Config, dataframe: pd.DataFrame):
         os.makedirs(ckpt_path, exist_ok=True)
         ckpt_path = os.path.join(ckpt_path, f"epoch_{epoch}_ckpt.pt")
         torch.save(ckpt, ckpt_path)
-        visualize_epoch_predictions(
-            config.path.artifacts_folder,
-            epoch,
-            model,
-            next(iter(dataloaders["val"])),
-            device,
-        )
 
 
 def main(args: ap.Namespace) -> None:
     config = read_config(args.config)
     if config.path.run_name is None:
-        config.path.run_name = generate_name(seed=config.training.seed)
+        config.path.run_name = generate_name()
     config.path.artifacts_folder = os.path.join(
         config.path.artifacts_folder, config.path.run_name
     )
