@@ -2,6 +2,9 @@ import torch
 from torch.nn.functional import one_hot, binary_cross_entropy
 
 
+SUPER_LARGE_COST = 100_000
+
+
 def are_priors_in_gts(
     priors: torch.Tensor, gt_boxes: torch.Tensor
 ) -> torch.Tensor:
@@ -205,7 +208,7 @@ def simota_assign_per_image(
     cls_cost = binary_cross_entropy(valid_probas.sqrt(), gt_onehot_label, reduction="none")
     cls_cost = cls_cost.sum(-1).T
 
-    cost_matrix = cls_cost * cls_weight + iou_cost * iou_weight + (~in_gt_and_in_center_boxes) * 10_000
+    cost_matrix = cls_cost * cls_weight + iou_cost * iou_weight + (~in_gt_and_in_center_boxes) * SUPER_LARGE_COST
     fg_mask_valid, matched_gt_valid, matched_ious_valid = dynamic_k_matching(cost_matrix, ious, topk)
 
     valid_idx = valid_mask.nonzero(as_tuple=False).squeeze(1)
