@@ -278,3 +278,12 @@ MIT License
 
 - Original YuNet: [libfacedetection](https://github.com/ShiqiYu/libfacedetection)
 - Training framework: [libfacedetection.train](https://github.com/ShiqiYu/libfacedetection.train)
+
+
+==================================================
+WiderFace Evaluation Results
+==================================================
+Easy   AP: 0.89029
+Medium AP: 0.88167
+Hard   AP: 0.81130
+==================================================
