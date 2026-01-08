@@ -5,6 +5,7 @@ from collections import defaultdict
 
 import pandas as pd
 import torch
+import torch.profiler
 import yaml
 from names_generator import generate_name
 from torch.utils.data import DataLoader
@@ -155,16 +156,17 @@ def train(config: Config, dataframe: pd.DataFrame):
                 for loss_name, loss_value in train_losses.items()
             ]
         )
-        log_str = (
-            log_str
-            + " "
-            + ", ".join(
-                [
-                    f"{metric_name}={metric_value:.4f}"
-                    for metric_name, metric_value in metrics.items()
-                ]
+        if metrics:
+            log_str = (
+                log_str
+                + " "
+                + ", ".join(
+                    [
+                        f"{metric_name}={metric_value:.4f}"
+                        for metric_name, metric_value in metrics.items()
+                    ]
+                )
             )
-        )
         log_str = log_str + f", Time: {train_time:.2f}s"
         print(f"[EPOCH {epoch + 1}/{config.training.epochs}] {log_str}")
         ckpt = {

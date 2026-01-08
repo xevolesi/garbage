@@ -103,33 +103,38 @@ def dynamic_k_matching(cost_matrix: torch.Tensor, ious: torch.Tensor, topk: int 
         matched_ious_valid: IoU with matched GT for foreground priors
     """
     num_gt, num_valid = cost_matrix.shape
+
     # Compute dynamic K for each GT box.
     k = min(topk, num_valid)
     top_ious, _ = torch.topk(ious, k, dim=1)
+    dynamic_ks = torch.clamp(top_ious.sum(1).int(), min=1)
 
-    ks = torch.clamp(top_ious.sum(1).int(), min=1).tolist()
-
-    # For i-th GT box select the best ks[i] predictions from valid boxes.
-    matching_matrix = ious.new_zeros(ious.shape)
+    # For each GT box select the best ks[i] predictions from valid boxes.
+    # This loop is O(num_gt) which is small (typically < 100 GTs per image).
+    matching_matrix = torch.zeros_like(cost_matrix, dtype=torch.uint8)
     for gt_idx in range(num_gt):
-        _, okay_idx = torch.topk(cost_matrix[gt_idx, :], k=ks[gt_idx], largest=False)
-        matching_matrix[gt_idx, okay_idx] = 1
+        _, pos_idx = torch.topk(
+            cost_matrix[gt_idx, :], k=dynamic_ks[gt_idx].item(), largest=False
+        )
+        matching_matrix[gt_idx, pos_idx] = 1
 
-    # Can i reimplement this loop in a vectorized fashion?
-    for j in range(num_valid):
-        matched_gt = matching_matrix[:, j]
+    del top_ious, dynamic_ks, pos_idx
 
-        # It's okay if we have 1 GT for 1 valid box or 0 gt for 1 valid box.
-        if matched_gt.sum() <= 1:
-            continue
+    # Vectorized: Handle priors matched to multiple GTs (author's elegant approach).
+    # For each such prior, keep only the GT with minimum cost.
+    # Note: Our matrix is transposed vs author's, so we sum along dim=0 (GTs) to get per-prior counts.
+    prior_match_gt_mask = (
+        matching_matrix.sum(0) > 1
+    )  # (num_valid,) - priors matching multiple GTs
+    if prior_match_gt_mask.sum() > 0:
+        # Find the GT with minimum cost for each multi-matched prior
+        # cost_matrix already has INF for invalid pairs, so argmin gives valid GT
+        _, cost_argmin = torch.min(cost_matrix[:, prior_match_gt_mask], dim=0)
+        matching_matrix[:, prior_match_gt_mask] *= 0
+        matching_matrix[cost_argmin, prior_match_gt_mask] = 1
 
-        # Match best GT in terms of cost with j-th valid predicted box.
-        gt_ids = torch.nonzero(matched_gt, as_tuple=False).squeeze(dim=1)
-        best_gt = gt_ids[torch.argmin(cost_matrix[gt_ids, j])]
-        matching_matrix[:, j] = 0
-        matching_matrix[best_gt, j] = 1
-    fg_mask_valid = matching_matrix.sum(dim=0) > 0
-    matched_gt_valid = matching_matrix.argmax(dim=0)
+    fg_mask_valid = matching_matrix.sum(0) > 0
+    matched_gt_valid = matching_matrix.argmax(0)
     matched_ious_valid = (matching_matrix * ious).sum(0)[fg_mask_valid]
     return fg_mask_valid, matched_gt_valid, matched_ious_valid
 
