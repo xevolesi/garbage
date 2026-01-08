@@ -100,6 +100,8 @@ class DetectionLoss(nn.Module):
 
         # ===== KEYPOINT LOSS =====
         # Loss only for foreground priors with visibility weighting
+        # Matches author's approach: use only per-face visibility weights,
+        # no per-keypoint -1 coordinate masking
         input_kps_fg = input_kps[foreground_mask]  # (K, 10)
         target_kps_fg = target_kps[foreground_mask]  # (K, 10)
         kps_weights_fg = kps_weights[foreground_mask]  # (K, 1)
@@ -114,16 +116,12 @@ class DetectionLoss(nn.Module):
             # Compute raw loss
             kps_loss_raw = self.kps_crit(input_kps_fg, encoded_target_kps)  # (K, 10)
 
-            # Mark invalid keypoints (value -1.0)
-            valid_kps_mask = target_kps_fg.ne(-1.0)  # (K, 10) bool
+            # Apply per-face visibility weights (broadcasts from (K,1) to (K,10))
+            # This matches author's: weight=kps_weights.view(-1, 1), avg_factor=sum(kps_weights)
+            weighted_kps_loss = kps_loss_raw * kps_weights_fg
 
-            # Apply visibility weights and compute final loss
-            # kps_weights: (K, 1), kps_loss_raw: (K, 10), valid_kps_mask: (K, 10)
-            weighted_kps_loss = kps_loss_raw * valid_kps_mask * kps_weights_fg
-
-            # Average over valid keypoints, weighted by visibility
-            num_valid_kps = (valid_kps_mask * kps_weights_fg).sum().clamp_min(1)
-            kps_loss = weighted_kps_loss.sum() / num_valid_kps
+            # Sum and divide by total visibility weight
+            kps_loss = weighted_kps_loss.sum() / kps_weights_fg.sum().clamp_min(1)
             kps_loss = self.kps_weight * kps_loss
         else:
             kps_loss = input_kps.sum() * 0.0  # scalar zero with correct device
@@ -147,28 +145,20 @@ class DetectionLoss(nn.Module):
         """
         Encode keypoints from pixel coordinates to prior-relative coordinates.
 
+        Matches author's _kps_encode: simply encodes all keypoints without
+        checking for invalid values. Invalid keypoints are handled via
+        visibility weights in the loss.
+
         Args:
             priors: (K, 4) [cx, cy, stride_w, stride_h]
-            kps: (K, 2*num_points) in pixel coordinates, with -1 for invalid keypoints
+            kps: (K, 2*num_points) in pixel coordinates
 
         Returns:
             Encoded keypoints: (K, 2*num_points) in normalized coordinates
         """
         num_points = kps.shape[-1] // 2
-        encoded = []
-
-        for i in range(num_points):
-            kp_xy = kps[:, [2 * i, 2 * i + 1]]  # (K, 2)
-
-            # Only encode if keypoint is valid
-            valid_mask = kp_xy[:, 0].ne(-1.0)  # (K,)
-
-            # Compute encoded coordinates: (kp - prior_center) / prior_stride
-            enc_xy = (kp_xy - priors[:, :2]) / priors[:, 2:]  # (K, 2)
-
-            # Set invalid keypoints back to -1 for masking in loss
-            enc_xy[~valid_mask] = -1.0
-
-            encoded.append(enc_xy)
-
-        return torch.cat(encoded, dim=1)  # (K, 2*num_points)
+        encoded_kps = [
+            (kps[:, [2 * i, 2 * i + 1]] - priors[:, :2]) / priors[:, 2:]
+            for i in range(num_points)
+        ]
+        return torch.cat(encoded_kps, dim=1)
