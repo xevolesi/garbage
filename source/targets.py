@@ -1,7 +1,9 @@
 import torch
+
 from .simota import simota_assign_per_image
 
 
+@torch.no_grad()
 def generate_targets(
     cls_logits: torch.Tensor,
     obj_logits: torch.Tensor,
@@ -97,6 +99,7 @@ def generate_targets(
     )
 
 
+@torch.no_grad()
 def generate_targets_batch(
     obj_preds: torch.Tensor,
     cls_preds: torch.Tensor,
