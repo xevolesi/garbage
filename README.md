@@ -72,6 +72,10 @@ D:\datasets\widerface\:
 
 To train on your custom dataset you need to convert your dataset into the format described above. Just be sure that `image` column in CSV file consists of right relative paths to your images.
 
+## Metrics
+
+During training pipeline logs `mAP` values on evaluation set. Note, that this is **NOT** `mAP` from WIDERFACE `eval_tools`. This is `mAP` metric calculated using `torchmetrics` and `faster-coco-eval`, so it's basically 3 values: `mAP small`, `mAP medium`, `mAP large`. These values are logged during training just to show training progress. More about this values you can read in `torchmetrics` documentation. Final WIDERFACE evaluation metrics you can compute using `evaluate_widerface.py`.
+
 # Results
 
 Author's results were taken from their training [repo](https://github.com/ShiqiYu/libfacedetection.train).
