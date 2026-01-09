@@ -1,7 +1,7 @@
 import torch
 from torch import nn
 
-from .blocks import DepthWiseConvUnit
+from .blocks import DWUnit
 from .utils import initialize_weights
 
 
@@ -18,17 +18,13 @@ class SingleLevelYuNetHead(nn.Module):
         self.num_box_coords = 4
         self.num_keypoints = num_keypoints
 
-        self.unit = DepthWiseConvUnit(self.in_channels, self.in_channels)
-        self.cls_out = DepthWiseConvUnit(
-            self.in_channels, self.num_classes, use_bn_relu=False
-        )
-        self.box_out = DepthWiseConvUnit(
-            self.in_channels, self.num_box_coords, use_bn_relu=False
-        )
-        self.kps_out = DepthWiseConvUnit(
+        self.unit = DWUnit(self.in_channels, self.in_channels)
+        self.cls_out = DWUnit(self.in_channels, self.num_classes, use_bn_relu=False)
+        self.box_out = DWUnit(self.in_channels, self.num_box_coords, use_bn_relu=False)
+        self.kps_out = DWUnit(
             self.in_channels, 2 * self.num_keypoints, use_bn_relu=False
         )
-        self.obj_out = DepthWiseConvUnit(self.in_channels, 1, use_bn_relu=False)
+        self.obj_out = DWUnit(self.in_channels, 1, use_bn_relu=False)
 
         initialize_weights(self)
 

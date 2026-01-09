@@ -12,7 +12,7 @@ def depthwise_conv3x3(in_channels: int, out_channels: int) -> nn.Conv2d:
     )
 
 
-class DepthWiseConvUnit(nn.Module):
+class DWUnit(nn.Module):
     def __init__(
         self, in_channels: int, out_channels: int, use_bn_relu: bool = True
     ) -> None:
@@ -32,19 +32,19 @@ class DepthWiseConvUnit(nn.Module):
         return self.relu(self.bn(self.dconv(self.pconv(tensor))))
 
 
-class DepthWiseBlock(nn.Module):
+class DWBlock(nn.Module):
     def __init__(self, in_channels: int, out_channels: int) -> None:
         super().__init__()
         self.in_channels = in_channels
         self.out_channels = out_channels
-        self.unit1 = DepthWiseConvUnit(self.in_channels, self.in_channels)
-        self.unit2 = DepthWiseConvUnit(self.in_channels, self.out_channels)
+        self.unit1 = DWUnit(self.in_channels, self.in_channels)
+        self.unit2 = DWUnit(self.in_channels, self.out_channels)
 
     def forward(self, tensor: torch.Tensor) -> torch.Tensor:
         return self.unit2(self.unit1(tensor))
 
 
-class Stem(nn.Module):
+class ConvHead(nn.Module):
     def __init__(self, in_channels: int, mid_channels: int, out_channels: int) -> None:
         super().__init__()
         self.in_channels = in_channels
@@ -55,7 +55,7 @@ class Stem(nn.Module):
         )
         self.bn = nn.BatchNorm2d(self.mid_channels)
         self.relu = nn.ReLU(inplace=True)
-        self.unit = DepthWiseConvUnit(self.mid_channels, self.out_channels)
+        self.unit = DWUnit(self.mid_channels, self.out_channels)
 
     def forward(self, tensor: torch.Tensor) -> torch.Tensor:
         return self.unit(self.relu(self.bn(self.sconv(tensor))))

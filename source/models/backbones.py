@@ -1,7 +1,7 @@
 import torch
 from torch import nn
 
-from .blocks import DepthWiseBlock, Stem
+from .blocks import ConvHead, DWBlock
 from .utils import initialize_weights
 
 
@@ -33,14 +33,14 @@ class YUNetBackbone(nn.Module):
         self.channels = channels
 
         # model0 - Stem (stride 2 conv + depthwise unit)
-        self.model0 = Stem(*self.channels[0])
+        self.model0 = ConvHead(*self.channels[0])
         # model1, model2 - early feature extraction
-        self.model1 = DepthWiseBlock(*self.channels[1])
-        self.model2 = DepthWiseBlock(*self.channels[2])
+        self.model1 = DWBlock(*self.channels[1])
+        self.model2 = DWBlock(*self.channels[2])
         # model3, model4, model5 - produce p8, p16, p32 outputs
-        self.model3 = DepthWiseBlock(*self.channels[3])
-        self.model4 = DepthWiseBlock(*self.channels[4])
-        self.model5 = DepthWiseBlock(*self.channels[5])
+        self.model3 = DWBlock(*self.channels[3])
+        self.model4 = DWBlock(*self.channels[4])
+        self.model5 = DWBlock(*self.channels[5])
 
         # Pooling layers for downsampling (matching downsample_idx=[0, 2, 3, 4])
         self.pool0 = nn.MaxPool2d(2, 2)  # after model0

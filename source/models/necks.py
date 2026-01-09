@@ -2,16 +2,16 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from .blocks import DepthWiseConvUnit
+from .blocks import DWUnit
 from .utils import initialize_weights
 
 
 class TinyFPN(nn.Module):
     def __init__(self) -> None:
         super().__init__()
-        self.p8unit = DepthWiseConvUnit(64, 64)
-        self.p16unit = DepthWiseConvUnit(64, 64)
-        self.p32unit = DepthWiseConvUnit(64, 64)
+        self.p8unit = DWUnit(64, 64)
+        self.p16unit = DWUnit(64, 64)
+        self.p32unit = DWUnit(64, 64)
         initialize_weights(self)
 
     def forward(
