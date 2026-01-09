@@ -1,7 +1,5 @@
 # Project specific.
-*.csv
 artifacts/
-libfacedetection.train/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
