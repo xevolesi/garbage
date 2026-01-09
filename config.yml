@@ -1,8 +1,8 @@
 path:
-  run_name: null
+  run_name: reimplementation
   base_dataset_folder: C:\Projects\yunet_pytorch\data\widerface
   artifacts_folder: artifacts
-  csv: C:\Projects\yunet_pytorch\data\widerface\widerface_main_3.csv
+  csv: C:\Projects\yunet_pytorch\data\widerface\widerface_main_4.csv
 
 dataset:
   image_path_col: image
