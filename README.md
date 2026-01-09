@@ -10,9 +10,23 @@ Author's repos:
 
 I don't like `mmdetection`. From my point of view it's to overcomplicated. I prefer clean `PyTorch` code.
 
+# Installation
+
+I used `Windows 11` with `python3.11`, `CUDA-13.1`. So, get `python3.11` and corresponding `venv` first. Than do the following:
+
+```code
+python3.11 -m venv .venv
+source .venv/bin/activate or .venv\Scripts\Activate.ps1 if you are on Windows
+pip install -r requirements.txt
+```
+
+Since there are no super frameworks like `mmdetection` or `mmcv` here, this repo should be easy to install. For specific version of python packages please check `requirements.txt`.
+
+
 # Notes and differencies
 
 ## Augmentations
+
 I use letter boxing during preprocessing for validation and inference. You can see more in `source/dataset/transforms`.
 
 ## Dataset

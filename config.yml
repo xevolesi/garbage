@@ -20,7 +20,7 @@ training:
   lr: 0.01
   momentum: 0.9
   weight_decay: 0.0005
-  epochs: 1
+  epochs: 640
 
   eval_interval: 1 # Perform mAP calculation and predictions logging every 1 epochs.
 
