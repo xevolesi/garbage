@@ -5,9 +5,7 @@ from collections import defaultdict
 
 import pandas as pd
 import torch
-import torch.profiler
 import yaml
-from names_generator import generate_name
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
@@ -186,7 +184,9 @@ def train(config: Config, dataframe: pd.DataFrame):
 def main(args: ap.Namespace) -> None:
     config = read_config(args.config)
     if config.path.run_name is None:
-        config.path.run_name = generate_name()
+        msg = "Run name is not provided in the config file. Using default run name."
+        raise ValueError(msg)
+
     config.path.artifacts_folder = os.path.join(
         config.path.artifacts_folder, config.path.run_name
     )
