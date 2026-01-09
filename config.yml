@@ -1,8 +1,8 @@
 path:
   run_name: reimplementation
-  base_dataset_folder: C:\Projects\yunet_pytorch\data\widerface
+  base_dataset_folder: D:\datasets\widerface
   artifacts_folder: artifacts
-  csv: C:\Projects\yunet_pytorch\data\widerface\widerface_main_4.csv
+  csv:  D:\datasets\widerface\widerface_main.csv
 
 dataset:
   image_path_col: image
@@ -20,7 +20,7 @@ training:
   lr: 0.01
   momentum: 0.9
   weight_decay: 0.0005
-  epochs: 640
+  epochs: 1
 
   eval_interval: 1 # Perform mAP calculation and predictions logging every 1 epochs.
 
