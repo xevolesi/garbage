@@ -1,28 +1,25 @@
 import argparse as ap
 import os
 import time
-from collections import defaultdict
 
 import pandas as pd
 import torch
-import yaml
-from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
 from source.config import Config
 from source.dataset import build_dataloaders
-from source.drawing import visualize_epoch_predictions
+from source.drawing import visualize_epoch_predictions, visualize_training_samples
 from source.general import (
     get_cpu_state_dict,
     load_optimizer_state_dict,
+    read_config,
     seed_everything,
 )
 from source.losses import DetectionLoss
 from source.metrics import calculate_map_torchmetrics
 from source.models import YuNet
-from source.postprocessing import postprocess_predictions
 from source.schedulers import WarmupMultiStepLR
-from source.targets import generate_targets_batch
+from source.training import train_one_epoch
 
 # Set benchmark to True and deterministic to False
 # if you want to speed up training with less level of reproducibility.
@@ -32,57 +29,6 @@ torch.backends.cudnn.deterministic = True
 # Speed up GEMM if GPU allowed to use TF32.
 torch.backends.cuda.matmul.allow_tf32 = True
 torch.backends.cudnn.allow_tf32 = True
-
-
-def read_config(path: str) -> Config:
-    with open(path, "r") as yaml_file:
-        yml = yaml.safe_load(yaml_file)
-    return Config.model_validate(yml)
-
-
-def train_one_epoch(
-    model: YuNet,
-    dataloader: DataLoader,
-    optimizer: torch.optim.Optimizer,
-    scheduler: WarmupMultiStepLR,
-    criterion: torch.nn.Module | torch.nn.modules.loss._Loss,
-    device: torch.device,
-) -> dict[str, float]:
-    model.train()
-    running_losses: defaultdict[str, float] = defaultdict(float)
-    for batch in dataloader:
-        optimizer.zero_grad()
-        images = batch["image"].to(device, non_blocking=True)
-        boxes = [item.to(device, non_blocking=True) for item in batch["boxes"]]
-        kps = [item.to(device, non_blocking=True) for item in batch["key_points"]]
-        p8_out, p16_out, p32_out = model(images)
-        obj_preds, cls_preds, box_preds, kps_preds, grids = postprocess_predictions(
-            (p8_out, p16_out, p32_out), (8, 16, 32)
-        )
-        (
-            foreground_mask,
-            target_cls,
-            target_obj,
-            target_boxes,
-            target_kps,
-            kps_weights,
-        ) = generate_targets_batch(
-            obj_preds, cls_preds, box_preds, grids, boxes, kps, device
-        )
-        targets = (target_obj, target_cls, target_boxes, target_kps, kps_weights)
-        inputs = (obj_preds, cls_preds, box_preds, kps_preds)
-        loss_dict: dict[str, torch.Tensor] = criterion(
-            inputs, targets, foreground_mask, grids
-        )
-        loss = loss_dict["total_loss"]
-        loss.backward()
-        optimizer.step()
-        scheduler.step_iter()
-
-        for loss_name, loss_tensor in loss_dict.items():
-            loss_value = loss_tensor.detach().cpu().item()
-            running_losses[f"train_{loss_name}"] += loss_value / len(dataloader)
-    return dict(running_losses)
 
 
 def train(config: Config, dataframe: pd.DataFrame):
@@ -122,15 +68,33 @@ def train(config: Config, dataframe: pd.DataFrame):
     model = model.to(device)
     tb_writer = SummaryWriter(log_dir=log_dir)
     for epoch in range(start_epoch, config.training.epochs):
+        # Let's visualize training samples for the first batch
+        # to see augmentated samples and labels. Visualized samples
+        # will be saved at `artifaccts_folder/epoch_{epoch}/sample_{i}.jpg`.
+        # NOTE: All samples in first batch for each epoch will be visualized.
+        visualize_training_samples(
+            config.path.artifacts_folder,
+            epoch,
+            next(iter(dataloaders["train"])),
+        )
+
+        # Train and val steps.
         train_start_time = time.perf_counter()
         train_losses = train_one_epoch(
-            model, dataloaders["train"], optimizer, scheduler, criterion, device
+            model,
+            dataloaders["train"],
+            optimizer,
+            scheduler,
+            criterion,
+            device,
         )
         train_end_time = time.perf_counter()
         train_time = train_end_time - train_start_time
         scheduler.step()
         metrics = {}
         if (epoch + 1) % config.training.eval_interval == 0:
+            # NOTE: This is NOT widerface evaluation metrics. This is `mAP`
+            # metric calculated using `torchmetrics` and `faster-coco-eval`.
             metrics = calculate_map_torchmetrics(model, dataloaders["val"], device)
             visualize_epoch_predictions(
                 config.path.artifacts_folder,

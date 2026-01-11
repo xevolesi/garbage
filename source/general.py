@@ -3,8 +3,15 @@ import random
 
 import numpy as np
 import torch
+import yaml
 
 from .config import Config
+
+
+def read_config(path: str) -> Config:
+    with open(path, "r") as yaml_file:
+        yml = yaml.safe_load(yaml_file)
+    return Config.model_validate(yml)
 
 
 def get_cpu_state_dict(state_dict):

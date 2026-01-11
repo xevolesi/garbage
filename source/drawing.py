@@ -1,11 +1,39 @@
 import os
 
 import cv2
-import torch
 import numpy as np
+import torch
 from torchvision.ops import nms
 
 from .postprocessing import postprocess_predictions
+
+
+def visualize_training_samples(
+    base_dir: str,
+    epoch: int,
+    batch: dict[str, torch.Tensor | list[torch.Tensor]],
+) -> None:
+    images = batch["image"]
+    boxes_gt = batch["boxes"]
+    kps_gt = batch["key_points"]
+
+    epoch_folder = os.path.join(base_dir, f"epoch_{epoch}")
+    os.makedirs(epoch_folder, exist_ok=True)
+    for i in range(images.shape[0]):
+        img = np.ascontiguousarray(images[i].permute(1, 2, 0).numpy().astype(np.uint8))
+        boxes = boxes_gt[i]
+        kps = kps_gt[i]
+        for box in boxes:
+            x1, y1, x2, y2 = box.numpy()
+            x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
+            cv2.rectangle(img, (x1, y1), (x2, y2), (0, 255, 0), 2)
+        for kp_set in kps:
+            for kp in kp_set:
+                x, y, vis = kp[:3] if len(kp) >= 3 else (*kp[:2], 1.0)
+                if vis > 0:  # Only draw visible keypoints
+                    x, y = int(x), int(y)
+                    cv2.circle(img, (x, y), 3, (0, 255, 0), -1)
+        cv2.imwrite(os.path.join(epoch_folder, f"sample_{i}.jpg"), img)
 
 
 @torch.no_grad()
