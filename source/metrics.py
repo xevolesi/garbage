@@ -1,21 +1,11 @@
 import torch
-
-from torchvision.ops import nms
 from torch.utils.data import DataLoader
 from torchmetrics.detection import MeanAveragePrecision
+from torchvision.ops import nms
 
-from .postprocessing import postprocess_predictions
 from source.models.yunet import YuNet
 
-
-def decode_keypoints(kps_preds: torch.Tensor, grids: torch.Tensor) -> torch.Tensor:
-    num_points = kps_preds.shape[-1] // 2
-    decoded = []
-    for i in range(num_points):
-        kp_encoded = kps_preds[:, [2 * i, 2 * i + 1]]
-        kp_decoded = kp_encoded * grids[:, 2:] + grids[:, :2]
-        decoded.append(kp_decoded)
-    return torch.cat(decoded, dim=1)
+from .postprocessing import postprocess_predictions
 
 
 @torch.no_grad()
@@ -43,19 +33,14 @@ def calculate_map_torchmetrics(
         for batch_idx in range(batch_size):
             sample_conf = conf[batch_idx]
             sample_boxes = box_preds[batch_idx]
-            sample_kps = kp_preds[batch_idx]
-            sample_priors = priors[batch_idx]
-            decoded_kps = decode_keypoints(sample_kps, sample_priors)
 
             sample_keep = sample_conf >= conf_thresh
             filt_conf = sample_conf[sample_keep]
             filt_boxes = sample_boxes[sample_keep]
-            filt_kps = decoded_kps[sample_keep]
 
             keep_indices = nms(filt_boxes, filt_conf, iou_thresh)
             filt_conf = filt_conf[keep_indices]
             filt_boxes = filt_boxes[keep_indices]
-            filt_kps = filt_kps[keep_indices]
 
             prep.append(
                 {

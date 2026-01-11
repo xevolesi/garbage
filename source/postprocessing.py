@@ -51,6 +51,31 @@ def generate_priors_for_stride(
     )
 
 
+def encode_keypoints(priors: torch.Tensor, kps: torch.Tensor) -> torch.Tensor:
+    num_points = kps.shape[-1] // 2
+    encoded_kps = [
+        (kps[:, [2 * i, 2 * i + 1]] - priors[:, :2]) / priors[:, 2:]
+        for i in range(num_points)
+    ]
+    return torch.cat(encoded_kps, dim=1)
+
+
+def decode_keypoints(kps_preds: torch.Tensor, grids: torch.Tensor) -> torch.Tensor:
+    num_points = kps_preds.shape[-1] // 2
+    decoded = []
+
+    for i in range(num_points):
+        # Extract encoded coordinates for i-th keypoint
+        kp_encoded = kps_preds[:, [2 * i, 2 * i + 1]]  # (N, 2)
+
+        # Decode: pixel_coords = encoded * stride + center
+        kp_decoded = kp_encoded * grids[:, 2:] + grids[:, :2]
+
+        decoded.append(kp_decoded)
+
+    return torch.cat(decoded, dim=1)  # (N, 10)
+
+
 def decode_boxes(grids: torch.Tensor, box_logits: torch.Tensor) -> torch.Tensor:
     """
     Decode predicted boxes from [center_x, center_y, with, height] to

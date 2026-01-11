@@ -5,7 +5,7 @@ import numpy as np
 import torch
 from torchvision.ops import nms
 
-from .postprocessing import postprocess_predictions
+from .postprocessing import decode_keypoints, postprocess_predictions
 
 
 def visualize_training_samples(
@@ -136,29 +136,3 @@ def visualize_epoch_predictions(
     os.makedirs(path, exist_ok=True)
     path = os.path.join(path, "random_predictions.png")
     cv2.imwrite(path, canvas)
-
-
-def decode_keypoints(kps_preds: torch.Tensor, grids: torch.Tensor) -> torch.Tensor:
-    """
-    Decode keypoint predictions from logits to pixel coordinates.
-
-    Args:
-        kps_preds: (N, 10) encoded keypoints
-        grids: (N, 4) priors [cx, cy, stride_w, stride_h]
-
-    Returns:
-        (N, 10) decoded keypoints in pixel coordinates
-    """
-    num_points = kps_preds.shape[-1] // 2
-    decoded = []
-
-    for i in range(num_points):
-        # Extract encoded coordinates for i-th keypoint
-        kp_encoded = kps_preds[:, [2 * i, 2 * i + 1]]  # (N, 2)
-
-        # Decode: pixel_coords = encoded * stride + center
-        kp_decoded = kp_encoded * grids[:, 2:] + grids[:, :2]
-
-        decoded.append(kp_decoded)
-
-    return torch.cat(decoded, dim=1)  # (N, 10)

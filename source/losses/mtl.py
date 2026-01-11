@@ -2,6 +2,7 @@ import torch
 from torch import nn
 
 from .eiou import EIoULoss
+from ..postprocessing import encode_keypoints
 
 
 class DetectionLoss(nn.Module):
@@ -109,9 +110,7 @@ class DetectionLoss(nn.Module):
 
         if input_kps_fg.numel() > 0:
             # Encode keypoint targets
-            encoded_target_kps = self._encode_keypoints(
-                priors_fg, target_kps_fg
-            )  # (K, 10)
+            encoded_target_kps = encode_keypoints(priors_fg, target_kps_fg)  # (K, 10)
 
             # Compute raw loss
             kps_loss_raw = self.kps_crit(input_kps_fg, encoded_target_kps)  # (K, 10)
@@ -136,29 +135,3 @@ class DetectionLoss(nn.Module):
             "box_loss": box_loss.detach(),
             "kps_loss": kps_loss.detach(),
         }
-
-    def _encode_keypoints(
-        self,
-        priors: torch.Tensor,
-        kps: torch.Tensor,
-    ) -> torch.Tensor:
-        """
-        Encode keypoints from pixel coordinates to prior-relative coordinates.
-
-        Matches author's _kps_encode: simply encodes all keypoints without
-        checking for invalid values. Invalid keypoints are handled via
-        visibility weights in the loss.
-
-        Args:
-            priors: (K, 4) [cx, cy, stride_w, stride_h]
-            kps: (K, 2*num_points) in pixel coordinates
-
-        Returns:
-            Encoded keypoints: (K, 2*num_points) in normalized coordinates
-        """
-        num_points = kps.shape[-1] // 2
-        encoded_kps = [
-            (kps[:, [2 * i, 2 * i + 1]] - priors[:, :2]) / priors[:, 2:]
-            for i in range(num_points)
-        ]
-        return torch.cat(encoded_kps, dim=1)
