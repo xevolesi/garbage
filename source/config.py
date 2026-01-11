@@ -5,7 +5,6 @@ from pydantic import BaseModel
 
 class PathConfig(BaseModel):
     run_name: str | None = None
-    base_dataset_folder: str
     artifacts_folder: str
     csv: str
 

@@ -1,18 +1,16 @@
-import os
 import typing as ty
 from functools import partial
 
 import cv2
-import pandas as pd
 import numpy as np
-from numpy.typing import NDArray
-
+import pandas as pd
 import torch
-from torch.utils.data import Dataset, DataLoader
+from numpy.typing import NDArray
+from torch.utils.data import DataLoader, Dataset
 
-from .utils import get_transforms, transform_list_of_coords_to_array, seed_worker
-from .transforms import AugmentationPipeline
 from ..config import Config
+from .transforms import AugmentationPipeline
+from .utils import get_transforms, seed_worker, transform_list_of_coords_to_array
 
 
 class DataPoint(ty.TypedDict):
@@ -31,17 +29,7 @@ class CSVDetectionDataset(Dataset):
         transforms: AugmentationPipeline | None = None,
     ) -> None:
         self.subset = subset
-        self.image_dir = os.path.join(
-            config.path.base_dataset_folder,
-            f"WIDER_{subset}",
-            f"WIDER_{subset}",
-            "images",
-        )
-        self.images = (
-            dataframe[config.dataset.image_path_col]
-            .apply(lambda path: os.path.join(self.image_dir, path))
-            .to_numpy()
-        )
+        self.images = dataframe[config.dataset.image_path_col].to_numpy()
 
         to_float32_array = partial(transform_list_of_coords_to_array, dtype=np.float32)
         self.boxes = (

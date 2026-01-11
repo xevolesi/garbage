@@ -50,7 +50,7 @@ class AnnotationContainer:
 
             name, height, width = image_meta.split(" ")
             image_path = os.path.join(
-                *name.split("/")
+                *self.base_dir.split(os.path.sep), *name.split("/")
             )  # This should be correct for Windows and Unix.
             self.images.append(image_path)
             self.meta.append((height, width))
@@ -117,7 +117,8 @@ if __name__ == "__main__":
         container = AnnotationContainer(image_dir, anno_file_path, subset == "train")
         dataframe = pd.DataFrame(data=container)
         dataframe["subset"] = subset
+        dataframe["source"] = "widerface"
         datasets.append(dataframe)
     dataset_df = pd.concat(datasets)
-    dataset_df_path = os.path.join(args.data_path, "widerface_main.csv")
+    dataset_df_path = os.path.join(args.data_path, "widerface_main_chck.csv")
     dataset_df.to_csv(dataset_df_path, index=False)

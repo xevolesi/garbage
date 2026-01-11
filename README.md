@@ -36,10 +36,11 @@ I use custom dataset format. It consists of images and single CSV file. CSV file
 image,boxes,key_points,subset
 ```
 where
-- `image` is the relative path to the image;
+- `image` is the **ABSOLUTE** path to the image;
 - `boxes` is the list of `[x1, y1, x2, y2]` boxes. Each column contains single list with multiple boxes, e.g. N faces on image = N boxes in list;
 - `key_points` is the list of facial key points in `[x, y, visibility]` format. Each column contains single list of lists of points, e.g. N faces on image = N boxes = N key points sets = N lists of lists with length 5 points (left eye, right eye, nose, left lip corner, right lib corner), each point is the list of 3 values `[x, y, visibility]`. `visibility` is the `visibility weight` that is `1` if this point in visible and `-1` otherwise. Note, that, during parsing (you can check `convert_widerface.py` script) `-1` visibility weight will be replaces to `0`. All questions about `labelv2` you can ask authors directly, since i don't know the rationale behind such visibility weight logic. As far as i remember guys from [insightface](https://github.com/deepinsight/insightface) use `labelv2` too; 
-- `subset` is the string with the subset name (`train` or `val`).
+- `subset` is the string with the subset name (`train` or `val`);
+- `source` is the name of the dataset.
 
 To translate your WIDERFACE dataset to this custom format you need to perform the following steps:
 1. Download [WIDERFACE](http://shuoyang1213.me/WIDERFACE/);
@@ -70,7 +71,7 @@ D:\datasets\widerface\:
     | - widerface_main.csv # This .csv will be added by `convert_widerface.py` script
 ```
 
-To train on your custom dataset you need to convert your dataset into the format described above. Just be sure that `image` column in CSV file consists of right relative paths to your images.
+To train on your custom dataset you need to convert your dataset into the format described above. Just be sure that `image` column in CSV file consists of **ABSOLUTE** paths to your images.
 
 ## Metrics
 
