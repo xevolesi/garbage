@@ -65,7 +65,6 @@ def visualize_epoch_predictions(
     for batch_idx in random_indices:
         img = images[batch_idx].cpu()
         img_np = img.permute(1, 2, 0).numpy().astype(np.uint8).copy()
-        img_np = cv2.cvtColor(img_np, cv2.COLOR_BGR2RGB)
 
         obj_pred = obj_preds[batch_idx].sigmoid().cpu()
         cls_pred = cls_preds[batch_idx].sigmoid().cpu()
