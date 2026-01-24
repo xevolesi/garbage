@@ -69,10 +69,16 @@ class WarmupMultiStepLR:
         return {
             "last_epoch": self.last_epoch,
             "current_iter": self.current_iter,
+            "base_lrs": self.base_lrs,
             "scheduler_state": self.scheduler.state_dict(),
         }
 
     def load_state_dict(self, state_dict):
         self.last_epoch = state_dict["last_epoch"]
         self.current_iter = state_dict["current_iter"]
+        # `base_lrs` is required for correct warmup continuation after resume,
+        # especially if config LR differs between runs.
+        self.base_lrs = state_dict.get(
+            "base_lrs", [group["lr"] for group in self.optimizer.param_groups]
+        )
         self.scheduler.load_state_dict(state_dict["scheduler_state"])
