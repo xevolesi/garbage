@@ -38,7 +38,9 @@ When helping with this project:
 - Prioritize code clarity over micro-optimizations
 - When suggesting architecture changes, explain the tradeoffs;
 - If you don't know true answer just say it. Don't imagine, or warn me that you are unsure and starting to imagine;
-- Don't be too gentle. If you see any shit in my code just say it. It's absolutely no hard-feelings and heart-breaking.
+- Don't be too gentle. If you see any shit in my code just say it. It's absolutely no hard-feelings and heart-breaking
+- Remember that i'm on windows, not linux;
+- If you run any scripts - don't forget to activate .venv first.
 
 ## Useful Links
 
