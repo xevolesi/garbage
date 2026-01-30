@@ -87,3 +87,9 @@ Mine reults were calculated using `evaluate_widerface.py` script using original 
 |-------|------|--------|------|--------|
 | YuNet-n (original) | 89.2 | 88.3 | 81.1 | ~75K |
 | YuNet-n (this repo) | 89.4 | 88.3 | 81.1 | ~75K |
+
+# Additional experiments
+WF + AP:
+Easy   AP: 0.88582
+Medium AP: 0.87446
+Hard   AP: 0.79689

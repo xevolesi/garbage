@@ -1,11 +1,48 @@
 import os
 import random
+from pathlib import Path
 
 import numpy as np
 import torch
 import yaml
 
 from .config import Config
+
+
+def ensure_correct_path(path_str: str) -> Path:
+    """
+    Ensures a path is absolute, resolved, and uses the correct format
+    for the current operating system.
+
+    Args:
+        path_str: The input path, which can be relative or contain
+                  shell variables/symlinks.
+
+    Returns:
+        A pathlib.Path object representing the absolute, resolved path.
+    """
+    # Expand shell variables (like $HOME) and user home directory (~user)
+    expanded_path = os.path.expandvars(os.path.expanduser(path_str))
+
+    # Create a Path object
+    p = Path(expanded_path)
+
+    # Resolve the path:
+    # 1. Makes it absolute if it's relative to the current working directory.
+    # 2. Collapses redundant separators (A//B becomes A/B).
+    # 3. Processes ".." and "." components (A/foo/../B becomes A/B).
+    # 4. Follows symbolic links to the actual file/directory.
+    try:
+        resolved_path = p.resolve()
+        return resolved_path
+    except FileNotFoundError:
+        # If the file or an intermediate directory doesn't exist, resolve() fails.
+        # In this case, we return an absolute path without existence check.
+        # This is useful if you want a correct path to a *potential* file.
+        return p.absolute()
+    except Exception as e:
+        print(f"An unexpected error occurred: {e}")
+        return p.absolute()  # Fallback
 
 
 def read_config(path: str) -> Config:

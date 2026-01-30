@@ -1,8 +1,13 @@
 path:
-  run_name: reimplementation
-  base_dataset_folder: D:\datasets\widerface
+  # If run_name is not provided, the training script will raise an error.
+  # Please provide a run name in the config file.
+  run_name: hsv-augmentation
+
+  # Folder to save artifacts: checkpoints, tensorboard logs, example predictions, etc.
   artifacts_folder: artifacts
-  csv:  D:\datasets\widerface\widerface_main.csv
+
+  # Path to the CSV file containing labels.
+  csv:  D:/datasets/main.csv
 
 dataset:
   image_path_col: image
@@ -17,7 +22,7 @@ training:
   num_workers: 8
   pin_memory: true
 
-  lr: 0.01
+  lr: 0.001
   momentum: 0.9
   weight_decay: 0.0005
   epochs: 640
@@ -48,6 +53,13 @@ train_transforms:
     - name: horizontal_flip
       p: 0.5
       kwargs: {}
+    - name: augment_hsv
+      p: 1.0
+      kwargs: {
+        hgain: 0.015,
+        sgain: 0.7,
+        vgain: 0.4,
+      }
     - name: to_float32_tensor
       p: 1.0
       kwargs: {}

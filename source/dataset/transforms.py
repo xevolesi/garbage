@@ -1,9 +1,9 @@
 import random
-from typing import Tuple, Optional
+from typing import Optional, Tuple
 
 import cv2
-import torch
 import numpy as np
+import torch
 from numpy.typing import NDArray
 
 from ..config import TransformsConfig
@@ -458,3 +458,46 @@ class AugmentationPipeline:
         box_labels = torch.from_numpy(box_labels).to(torch.float32)
         keypoints_weights = torch.from_numpy(keypoints_weights).to(torch.float32)
         return image, boxes, keypoints, box_labels, keypoints_weights
+
+    def augment_hsv(
+        self,
+        image: NDArray[np.uint8],
+        boxes: NDArray[np.float32],
+        keypoints: NDArray[np.float32],
+        box_labels: NDArray[np.int64],
+        keypoints_weights: NDArray[np.float32],
+        hgain: float = 0.015,
+        sgain: float = 0.7,
+        vgain: float = 0.4,
+    ) -> tuple[NDArray, ...]:
+        """
+        HSV color-space augmentation.
+
+        Args:
+            img: BGR image (numpy array)
+            hgain: Hue gain (fraction, default 0.015)
+            sgain: Saturation gain (fraction, default 0.7)
+            vgain: Value/brightness gain (fraction, default 0.4)
+        """
+        # Random gains between (1-gain) and (1+gain)
+        r = np.random.uniform(-1, 1, 3) * [hgain, sgain, vgain] + 1
+
+        # Convert BGR to HSV
+        hue, sat, val = cv2.split(cv2.cvtColor(image, cv2.COLOR_BGR2HSV))
+        dtype = image.dtype  # uint8
+
+        # Build lookup tables for each channel
+        x = np.arange(0, 256, dtype=np.int16)
+        lut_hue = ((x * r[0]) % 180).astype(dtype)  # Hue wraps at 180
+        lut_sat = np.clip(x * r[1], 0, 255).astype(dtype)
+        lut_val = np.clip(x * r[2], 0, 255).astype(dtype)
+
+        # Apply lookup tables
+        img_hsv = cv2.merge(
+            (cv2.LUT(hue, lut_hue), cv2.LUT(sat, lut_sat), cv2.LUT(val, lut_val))
+        ).astype(dtype)
+
+        # Convert back to BGR
+        img_bgr = cv2.cvtColor(img_hsv, cv2.COLOR_HSV2BGR)
+
+        return img_bgr, boxes, keypoints, box_labels, keypoints_weights
